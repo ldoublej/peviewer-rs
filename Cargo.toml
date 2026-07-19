@@ -15,3 +15,6 @@ path = "src/cli/main.rs"
 
 
 [dependencies]
+
+[dev-dependencies]
+tempfile = "3"
