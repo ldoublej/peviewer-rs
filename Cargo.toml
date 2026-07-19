@@ -1,0 +1,17 @@
+[package]
+name = "peviewer-rs"
+version = "0.1.0"
+edition = "2024"
+
+
+
+[lib]
+name = "pe"
+path = "src/lib/lib.rs"
+
+[[bin]]
+name = "peviewer-rs"
+path = "src/cli/main.rs"
+
+
+[dependencies]
