@@ -1,3 +1,4 @@
 pub mod data_source;
 pub mod file_data_source;
-pub mod pe;
+mod pe;
+pub use pe::PeFile;
