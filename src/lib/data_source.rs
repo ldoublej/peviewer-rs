@@ -1,5 +1,9 @@
 use std::fmt::Debug;
 use std::path::PathBuf;
+
+mod file_data_source;
+pub use file_data_source::FileDataSource;
+
 // ---------------------------------------------------------------------------
 // Error type
 // ---------------------------------------------------------------------------
