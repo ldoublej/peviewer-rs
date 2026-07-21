@@ -22,7 +22,7 @@ impl FileDataSource {
     /// Open a file for reading as a data source.
     ///
     /// Returns [`DataSourceError::FileNotFound`] if the path does not exist.
-    pub fn open_file(path: &Path) -> Result<Self, DataSourceError> {
+    pub fn open_file(path: &Path) -> Result<Box<Self>, DataSourceError> {
         if !path.exists() {
             return Err(DataSourceError::FileNotFound {
                 path: path.to_path_buf(),
@@ -30,10 +30,10 @@ impl FileDataSource {
         }
 
         let file = std::fs::File::open(path)?;
-        Ok(Self {
+        Ok(Box::new(Self {
             file_path_buf: path.to_path_buf(),
             file,
-        })
+        }))
     }
 
     /// The path this data source was opened from.
@@ -51,7 +51,7 @@ impl DataSource for FileDataSource {
         self.file.metadata().ok().map(|m| m.len())
     }
 
-    fn read_exact(&self, offset: u64, buf: &mut [u8]) -> Result<(), DataSourceError> {
+    fn read_exact(&self, offset: u64, buf: &mut [u8]) -> Result<usize, DataSourceError> {
         let mut cursor = 0usize;
 
         while cursor < buf.len() {
@@ -69,8 +69,9 @@ impl DataSource for FileDataSource {
             cursor += n;
         }
 
-        Ok(())
+        Ok(cursor)
     }
+
 }
 
 // ---------------------------------------------------------------------------

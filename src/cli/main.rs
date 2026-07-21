@@ -5,12 +5,12 @@ use pe::PeFile;
 
 fn main() {
     let self_path = std::env::current_exe().unwrap();
-    let result_of_opening = FileDataSource::open_file(&self_path);
-    match result_of_opening {
+    let result = FileDataSource::open_file(&self_path);
+    match result {
         Ok(file_data) => {
-            let pe = PeFile::parse(&file_data).unwrap();
-            let _dos_magic = pe.dos_magic();
-            println!("Hello, world!");
+            let pe = PeFile::parse(file_data).unwrap();
+
+            println!("{:?}",pe.get_image_dos_header());
         }
         Err(e) => {
             println!("{}", e);

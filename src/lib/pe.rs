@@ -1,50 +1,45 @@
 use crate::data_source::{DataSource, DataSourceExt};
-
+use crate::pe_structs::IMAGE_DOS_HEADER;
 
 #[derive(Debug)]
-pub struct PeFile<'a> {
-    dos_header: [u8; 64],
-    _data_source: &'a dyn DataSource,
+pub struct PeFile {
+    dos_header: IMAGE_DOS_HEADER,
+    data_source: Box<dyn DataSource>,
 }
 
-impl<'a> PeFile<'a> {
-    pub fn parse<T: DataSource>(source: &'a T) -> Result<Self, ParseError> {
+impl PeFile {
+    pub fn parse(source: Box<dyn DataSource>) -> Result<Self, ParseError> {
         let len = source.len().unwrap_or(0);
         if len < 64 {
             return Err(ParseError::TooSmall(len));
         }
-
-        let dos_header: [u8; 64] = source
-            .read_array(0)
-            .map_err(ParseError::DataSource)?;
-
-        if dos_header[0] != b'M' || dos_header[1] != b'Z' {
+        
+        // Read the DOS header bytes directly into the struct.
+        let mut dos_header = IMAGE_DOS_HEADER::default();
+        source.read_struct(0, &mut dos_header).map_err(ParseError::DataSource)?;
+        // DOS magic is "MZ" → 0x5A4D in little-endian u16
+        if dos_header.e_magic != 0x5A4D {
             return Err(ParseError::InvalidMagic {
                 expected: "MZ",
-                found: format!("{}{}", dos_header[0] as char, dos_header[1] as char),
+                found: format!("{:#06X}", dos_header.e_magic),
             });
         }
+        let mut current_offset : usize = dos_header.e_lfanew as usize;
+        
+
 
         Ok(Self {
             dos_header,
-            _data_source: source,
+            data_source: source,
         })
     }
 
-
-    /// Returns the DOS signature bytes ("MZ" at offset 0).
-    pub fn dos_magic(&self) -> [u8; 2] {
-        [self.dos_header[0], self.dos_header[1]]
+    pub fn get_data_source(&self) -> &dyn DataSource {
+        self.data_source.as_ref()
     }
 
-    /// Returns the file offset of the PE signature (`e_lfanew`, at offset 0x3C).
-    pub fn e_lfanew(&self) -> u32 {
-        u32::from_le_bytes([
-            self.dos_header[0x3C],
-            self.dos_header[0x3D],
-            self.dos_header[0x3E],
-            self.dos_header[0x3F],
-        ])
+    pub fn get_image_dos_header(&self) -> & IMAGE_DOS_HEADER {
+        &self.dos_header
     }
 }
 
