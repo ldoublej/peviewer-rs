@@ -18,12 +18,14 @@ impl PeFile {
         let mut dos_header = IMAGE_DOS_HEADER::default();
         source.read_struct(0, &mut dos_header).map_err(ParseError::DataSource)?;
         // DOS magic is "MZ" → 0x5A4D in little-endian u16
-        if dos_header.e_magic != 0x5A4D {
+        if dos_header.e_magic != IMAGE_DOS_SIGNATURE {
             return Err(ParseError::InvalidMagic {
                 expected: "MZ",
                 found: format!("{:#06X}", dos_header.e_magic),
             });
         }
+
+
         let mut current_offset : usize = dos_header.e_lfanew as usize;
 
         // Peek optional header Magic field
@@ -33,14 +35,16 @@ impl PeFile {
         let nt_header: IMAGE_NT_HEADERS;
         match magic {
             IMAGE_NT_OPTIONAL_HDR64_MAGIC => {
-                let nt_header64: IMAGE_NT_HEADERS64;
-                
-
-
-                nt_header = IMAGE_NT_HEADERS::PE32P(nt_header64)
+                let mut nt_header64: IMAGE_NT_HEADERS64 = unsafe { std::mem::zeroed() };
+                let sz = source.read_struct(current_offset as u64, &mut nt_header64).map_err(ParseError::DataSource)?;
+                current_offset += sz;
+                nt_header = IMAGE_NT_HEADERS::PE32P(nt_header64);
             }
             IMAGE_NT_OPTIONAL_HDR32_MAGIC => {
-                
+                let mut nt_header32: IMAGE_NT_HEADERS32 = unsafe { std::mem::zeroed() };
+                let sz = source.read_struct(current_offset as u64, &mut nt_header32).map_err(ParseError::DataSource)?;
+                current_offset += sz;
+                nt_header = IMAGE_NT_HEADERS::PE32(nt_header32);
             }
             _ => {
                 return Err(ParseError::InvalidMagic { 
@@ -49,6 +53,10 @@ impl PeFile {
                 });
             }
         }
+
+        // first section offset
+        //current_offset
+
 
         Ok(Self {
             dos_header,
@@ -63,6 +71,10 @@ impl PeFile {
 
     pub fn get_image_dos_header(&self) -> & IMAGE_DOS_HEADER {
         &self.dos_header
+    }
+
+    pub fn get_nt_headers(&self) -> & IMAGE_NT_HEADERS {
+        &self.nt_header
     }
 }
 

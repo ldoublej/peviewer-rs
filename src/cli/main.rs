@@ -9,7 +9,7 @@ fn main() {
     match result {
         Ok(file_data) => {
             let pe = PeFile::parse(file_data).unwrap();
-            println!("{:?}",pe.get_image_dos_header());
+            println!("{:#?}",pe.get_nt_headers());
         }
         Err(e) => {
             println!("{}", e);

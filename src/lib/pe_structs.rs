@@ -19,6 +19,8 @@ Sources:
 use std::{fmt};
 
 
+pub const IMAGE_DOS_SIGNATURE: u16 = 0x5A4D;
+
 #[derive(Copy, Clone, Debug, Default)]
 #[repr(C)]
 pub struct IMAGE_DOS_HEADER {
@@ -230,7 +232,7 @@ pub struct IMAGE_OPTIONAL_HEADER64 {
 
 pub const IMAGE_NT_HEADERS_SIGNATURE: u32 = 0x00004550;
 
-
+#[derive(Copy, Clone, Debug)]
 pub enum IMAGE_NT_HEADERS {
 	PE32(IMAGE_NT_HEADERS32),
 	PE32P(IMAGE_NT_HEADERS64)
