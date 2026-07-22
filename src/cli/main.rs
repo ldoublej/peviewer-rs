@@ -9,7 +9,9 @@ fn main() {
     match result {
         Ok(file_data) => {
             let pe = PeFile::parse(file_data).unwrap();
-            println!("{:#?}",pe.get_nt_headers());
+            println!("{:#?}",pe.dos_header());
+            println!("{:#?}",pe.nt_headers());
+            println!("{:#?}",pe.sections());
         }
         Err(e) => {
             println!("{}", e);

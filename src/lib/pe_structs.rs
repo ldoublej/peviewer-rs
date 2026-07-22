@@ -194,7 +194,7 @@ pub struct IMAGE_OPTIONAL_HEADER32 {
 	pub SizeOfHeapCommit: u32,
 	pub LoaderFlags: u32,
 	pub NumberOfRvaAndSizes: u32,
-	pub DataDirectory: [IMAGE_DATA_DIRECTORY; 0],
+	pub DataDirectory: [IMAGE_DATA_DIRECTORY; IMAGE_NUMBEROF_DIRECTORY_ENTRIES],
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -225,7 +225,7 @@ pub struct IMAGE_OPTIONAL_HEADER64 {
 	pub SizeOfHeapCommit: u64,
 	pub LoaderFlags: u32,
 	pub NumberOfRvaAndSizes: u32,
-	pub DataDirectory: [IMAGE_DATA_DIRECTORY; 0],
+	pub DataDirectory: [IMAGE_DATA_DIRECTORY; IMAGE_NUMBEROF_DIRECTORY_ENTRIES],
 }
 
 //----------------------------------------------------------------

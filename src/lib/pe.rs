@@ -5,12 +5,13 @@ pub struct PeFile {
     dos_header: IMAGE_DOS_HEADER,
     data_source: Box<dyn DataSource>,
     nt_header: IMAGE_NT_HEADERS,
+    sections: Vec<IMAGE_SECTION_HEADER>,
 }
 
 impl PeFile {
     pub fn parse(source: Box<dyn DataSource>) -> Result<Self, ParseError> {
         let len = source.len().unwrap_or(0);
-        if len < 64 {
+        if len < std::mem::size_of::<IMAGE_DOS_HEADER>() as u64 {
             return Err(ParseError::TooSmall(len));
         }
 
@@ -24,7 +25,6 @@ impl PeFile {
                 found: format!("{:#06X}", dos_header.e_magic),
             });
         }
-
 
         let mut current_offset : usize = dos_header.e_lfanew as usize;
 
@@ -54,27 +54,50 @@ impl PeFile {
             }
         }
 
-        // first section offset
-        //current_offset
+        let  section_count;
+        match nt_header {
+            IMAGE_NT_HEADERS::PE32P(headers) => {
+                section_count = headers.FileHeader.NumberOfSections;
+            }
+            IMAGE_NT_HEADERS::PE32(headers) => {
+                section_count = headers.FileHeader.NumberOfSections;
+            }
+        }
 
+        
+        // read sections
+        let mut sections = Vec::new();
+        for _ in 0..section_count {
+            let mut section_header: IMAGE_SECTION_HEADER = unsafe { std::mem::zeroed() };
+            let sz = source.read_struct(current_offset as u64, &mut section_header).map_err(ParseError::DataSource)?;
+            current_offset += sz;
+            sections.push(section_header);
+        }
+        
+        
 
         Ok(Self {
             dos_header,
             data_source: source,
-            nt_header:nt_header
+            nt_header: nt_header,
+            sections: sections
         })
     }
 
-    pub fn get_data_source(&self) -> &dyn DataSource {
+    pub fn data_source(&self) -> &dyn DataSource {
         self.data_source.as_ref()
     }
 
-    pub fn get_image_dos_header(&self) -> & IMAGE_DOS_HEADER {
+    pub fn dos_header(&self) -> & IMAGE_DOS_HEADER {
         &self.dos_header
     }
 
-    pub fn get_nt_headers(&self) -> & IMAGE_NT_HEADERS {
+    pub fn nt_headers(&self) -> & IMAGE_NT_HEADERS {
         &self.nt_header
+    }
+
+    pub fn sections(&self) -> &Vec<IMAGE_SECTION_HEADER> {
+        &self.sections
     }
 }
 
