@@ -1,10 +1,10 @@
 use crate::data_source::{DataSource, DataSourceExt};
-use crate::pe_structs::IMAGE_DOS_HEADER;
+use crate::pe_structs::{*};
 
-#[derive(Debug)]
 pub struct PeFile {
     dos_header: IMAGE_DOS_HEADER,
     data_source: Box<dyn DataSource>,
+    nt_header: IMAGE_NT_HEADERS,
 }
 
 impl PeFile {
@@ -13,7 +13,7 @@ impl PeFile {
         if len < 64 {
             return Err(ParseError::TooSmall(len));
         }
-        
+
         // Read the DOS header bytes directly into the struct.
         let mut dos_header = IMAGE_DOS_HEADER::default();
         source.read_struct(0, &mut dos_header).map_err(ParseError::DataSource)?;
@@ -25,12 +25,35 @@ impl PeFile {
             });
         }
         let mut current_offset : usize = dos_header.e_lfanew as usize;
-        
 
+        // Peek optional header Magic field
+        let magic_offset =current_offset + std::mem::size_of::<u32>() + std::mem::size_of::<IMAGE_FILE_HEADER>();
+        let magic = source.read_u16(magic_offset as u64).map_err(ParseError::DataSource)?;
+
+        let nt_header: IMAGE_NT_HEADERS;
+        match magic {
+            IMAGE_NT_OPTIONAL_HDR64_MAGIC => {
+                let nt_header64: IMAGE_NT_HEADERS64;
+                
+
+
+                nt_header = IMAGE_NT_HEADERS::PE32P(nt_header64)
+            }
+            IMAGE_NT_OPTIONAL_HDR32_MAGIC => {
+                
+            }
+            _ => {
+                return Err(ParseError::InvalidMagic { 
+                    expected: "0x10b or 0x20b 0r 0x107",
+                    found: format!("{:#06X}", magic )
+                });
+            }
+        }
 
         Ok(Self {
             dos_header,
             data_source: source,
+            nt_header:nt_header
         })
     }
 
