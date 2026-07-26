@@ -1,7 +1,5 @@
-use pe::data_source::FileDataSource;
 use pe::PeFile;
-
-
+use pe::data_source::FileDataSource;
 
 fn main() {
     let self_path = std::env::current_exe().unwrap();
@@ -9,9 +7,9 @@ fn main() {
     match result {
         Ok(file_data) => {
             let pe = PeFile::parse(file_data).unwrap();
-            println!("{:#?}",pe.dos_header());
-            println!("{:#?}",pe.nt_headers());
-            println!("{:#?}",pe.sections());
+            println!("{:#?}", pe.dos_header());
+            println!("{:#?}", pe.nt_headers());
+            println!("{:#?}", pe.sections());
         }
         Err(e) => {
             println!("{}", e);

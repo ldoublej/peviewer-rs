@@ -18,9 +18,7 @@ pub enum DataSourceError {
         source_len: Option<u64>,
     },
     /// The file was not found at the given path.
-    FileNotFound {
-        path: PathBuf,
-    },
+    FileNotFound { path: PathBuf },
     /// An underlying I/O error occurred.
     Io(std::io::Error),
 }
@@ -28,8 +26,18 @@ pub enum DataSourceError {
 impl PartialEq for DataSourceError {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::OutOfBounds { offset: a, length: b, source_len: c },
-             Self::OutOfBounds { offset: d, length: e, source_len: f }) => a == d && b == e && c == f,
+            (
+                Self::OutOfBounds {
+                    offset: a,
+                    length: b,
+                    source_len: c,
+                },
+                Self::OutOfBounds {
+                    offset: d,
+                    length: e,
+                    source_len: f,
+                },
+            ) => a == d && b == e && c == f,
             (Self::FileNotFound { path: a }, Self::FileNotFound { path: b }) => a == b,
             (Self::Io(a), Self::Io(b)) => a.kind() == b.kind(),
             _ => false,
@@ -171,9 +179,7 @@ pub trait DataSourceExt: DataSource {
     /// whose fields are all `u8`/`u16`/`u32`/`u64`/`[uN; M]`.
     fn read_struct<T>(&self, offset: u64, strcut: &mut T) -> Result<usize, DataSourceError> {
         let size = std::mem::size_of::<T>();
-        let slice = unsafe {
-            std::slice::from_raw_parts_mut(strcut as *mut T as *mut u8, size)
-        };
+        let slice = unsafe { std::slice::from_raw_parts_mut(strcut as *mut T as *mut u8, size) };
         self.read_exact(offset, slice)
     }
 
@@ -230,4 +236,3 @@ pub trait DataSourceExt: DataSource {
 
 // Blanket implementation: every DataSource also gets DataSourceExt.
 impl<T: DataSource + ?Sized> DataSourceExt for T {}
-

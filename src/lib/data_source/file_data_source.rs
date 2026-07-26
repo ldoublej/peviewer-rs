@@ -1,6 +1,6 @@
+use crate::data_source::{DataSource, DataSourceError};
 use std::fs::File;
 use std::path::{Path, PathBuf};
-use crate::data_source::{DataSource, DataSourceError};
 
 // Platform-specific positioned read (like pread on Unix).
 #[cfg(unix)]
@@ -71,7 +71,6 @@ impl DataSource for FileDataSource {
 
         Ok(cursor)
     }
-
 }
 
 // ---------------------------------------------------------------------------
@@ -125,8 +124,7 @@ mod tests {
 
     #[test]
     fn file_not_found() {
-        let err =
-            FileDataSource::open_file(Path::new("/nonexistent/foo.exe")).unwrap_err();
+        let err = FileDataSource::open_file(Path::new("/nonexistent/foo.exe")).unwrap_err();
         assert!(matches!(err, DataSourceError::FileNotFound { .. }));
     }
 
