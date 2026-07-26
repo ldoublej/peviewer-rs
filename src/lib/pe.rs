@@ -1,5 +1,6 @@
-use crate::data_source::{DataSource, DataSourceExt};
+use crate::data_source::{DataSource, DataSourceExt, FileDataSource};
 use crate::pe_structs::*;
+use std::path::Path;
 
 pub struct PeFile {
     dos_header: IMAGE_DOS_HEADER,
@@ -9,7 +10,7 @@ pub struct PeFile {
 }
 
 impl PeFile {
-    pub fn parse(data_source: Box<dyn DataSource>) -> Result<Self, ParseError> {
+    pub fn open_from_datasource(data_source: Box<dyn DataSource>) -> Result<Self, ParseError> {
         let len = data_source.len().unwrap_or(0);
         if len < std::mem::size_of::<IMAGE_DOS_HEADER>() as u64 {
             return Err(ParseError::TooSmall(len));
@@ -89,6 +90,14 @@ impl PeFile {
             nt_header,
             sections,
         })
+    }
+
+    pub fn open_from_file(file_path: &Path) -> Result<Self, ParseError> {
+        let result = FileDataSource::open_file(file_path);
+        match result {
+            Ok(file_data) => PeFile::open_from_datasource(file_data),
+            Err(e) => Err(crate::pe::ParseError::DataSource(e)),
+        }
     }
 
     pub fn data_source(&self) -> &dyn DataSource {
