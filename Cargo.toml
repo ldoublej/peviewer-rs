@@ -15,6 +15,7 @@ path = "src/cli/main.rs"
 
 
 [dependencies]
+clap = { version = "4", features = ["derive"] }
 
 [dev-dependencies]
 tempfile = "3"
