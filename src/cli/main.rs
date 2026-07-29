@@ -1,8 +1,8 @@
 use clap::{Parser, ValueEnum};
 use comfy_table::presets::UTF8_FULL;
-use comfy_table::{Cell, ContentArrangement, Table};
+use comfy_table::{ContentArrangement, Table};
 use pe::PeFile;
-use pe::report::Field;
+use pe::report::Report;
 use std::path::PathBuf;
 use std::process;
 
@@ -84,10 +84,6 @@ struct Cli {
     /// Print all available content. Unimplemented directories are skipped.
     #[arg(long)]
     all: bool,
-
-    /// Use the raw `{:#?}` debug format instead of pretty tables.
-    #[arg(long)]
-    raw: bool,
 }
 
 /// Selectable data source for a PE image.
@@ -138,32 +134,16 @@ fn main() {
 
     // Implemented content.
     if want(cli.dos) {
-        println!("=== DOS Header ===");
-        if cli.raw {
-            println!("{:#?}", pe_file.dos_header());
-        } else {
-            print_field_table(pe_file.dos_header_report());
-        }
+        print_report(pe_file.dos_header_report());
     }
 
     if want(cli.nt) {
-        println!("=== File Header ===");
-        if cli.raw {
-            println!("{:#?}", pe_file.nt_headers());
-        } else {
-            print_field_table(pe_file.file_header_report());
-            println!("=== Optional Header ===");
-            print_field_table(pe_file.optional_header_report());
-        }
+        print_report(pe_file.file_header_report());
+        print_report(pe_file.optional_header_report());
     }
 
     if want(cli.sections) {
-        println!("=== Sections ===");
-        if cli.raw {
-            println!("{:#?}", pe_file.sections());
-        } else {
-            print_section_table(pe_file.sections_report());
-        }
+        print_report(pe_file.sections_report());
     }
 
     // Directories that are not wired up yet. They are only reported when
@@ -199,37 +179,19 @@ fn open_source(source: &Source, input: &str) -> Result<PeFile, String> {
     }
 }
 
-/// Render key/value [`Field`] rows as a three-column table.
-fn print_field_table(fields: Vec<Field>) {
+/// Render any [`Report`] as a table, printed under a `=== <title> ===`
+/// heading.
+fn print_report(report: Report) {
     let mut table = Table::new();
     table
         .load_preset(UTF8_FULL)
         .set_content_arrangement(ContentArrangement::Dynamic)
-        .set_header(vec!["Field", "Value", "Note"]);
+        .set_header(report.headers);
 
-    for f in fields {
-        table.add_row(vec![
-            Cell::new(f.name),
-            Cell::new(f.value),
-            Cell::new(f.note.unwrap_or_default()),
-        ]);
-    }
-
-    println!("{table}");
-}
-
-/// Render section rows as a multi-column table using
-/// [`pe::report::SECTION_COLUMNS`] as the header.
-fn print_section_table(rows: Vec<Vec<String>>) {
-    let mut table = Table::new();
-    table
-        .load_preset(UTF8_FULL)
-        .set_content_arrangement(ContentArrangement::Dynamic)
-        .set_header(pe::report::SECTION_COLUMNS.to_vec());
-
-    for row in rows {
+    for row in report.rows {
         table.add_row(row);
     }
 
+    println!("=== {} ===", report.title);
     println!("{table}");
 }

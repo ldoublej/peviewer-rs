@@ -32,6 +32,50 @@ impl Field {
     }
 }
 
+/// A renderable table: a title, column headers, and rows of already-formatted
+/// cells. A frontend can print any `Report` uniformly without knowing which
+/// part of the PE it describes.
+#[derive(Clone, Debug)]
+pub struct Report {
+    /// Section heading, e.g. `"DOS Header"`.
+    pub title: String,
+    /// Column headers.
+    pub headers: Vec<String>,
+    /// Rows of cells, each aligned with [`headers`](Self::headers).
+    pub rows: Vec<Vec<String>>,
+}
+
+impl Report {
+    /// Build a report from an explicit header row and pre-formatted rows.
+    pub fn new(title: impl Into<String>, headers: &[&str], rows: Vec<Vec<String>>) -> Self {
+        Self {
+            title: title.into(),
+            headers: headers.iter().map(|h| h.to_string()).collect(),
+            rows,
+        }
+    }
+
+    /// Build a key/value report from [`Field`]s, using the standard
+    /// `Field / Value / Note` columns.
+    pub fn from_fields(title: impl Into<String>, fields: Vec<Field>) -> Self {
+        let rows = fields
+            .into_iter()
+            .map(|f| {
+                vec![
+                    f.name.to_string(),
+                    f.value,
+                    f.note.unwrap_or_default(),
+                ]
+            })
+            .collect();
+        Self {
+            title: title.into(),
+            headers: vec!["Field".to_string(), "Value".to_string(), "Note".to_string()],
+            rows,
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Value formatting helpers
 // ---------------------------------------------------------------------------

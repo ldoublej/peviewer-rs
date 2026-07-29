@@ -116,44 +116,52 @@ impl PeFile {
         &self.sections
     }
 
-    // -- Report rows --------------------------------------------------------
-    // These expose the parsed structures as presentation-agnostic rows so a
-    // frontend can render them (as a table, JSON, ...) without needing access
-    // to the private `pe_structs` types.
+    // -- Reports ------------------------------------------------------------
+    // These expose the parsed structures as presentation-agnostic `Report`s
+    // (title + headers + rows) so a frontend can print them uniformly without
+    // needing access to the private `pe_structs` types.
 
-    /// Key/value rows for the DOS header.
-    pub fn dos_header_report(&self) -> Vec<crate::report::Field> {
-        crate::report::dos_header_fields(&self.dos_header)
+    /// Report for the DOS header.
+    pub fn dos_header_report(&self) -> crate::report::Report {
+        crate::report::Report::from_fields(
+            "DOS Header",
+            crate::report::dos_header_fields(&self.dos_header),
+        )
     }
 
-    /// Key/value rows for the COFF file header.
-    pub fn file_header_report(&self) -> Vec<crate::report::Field> {
+    /// Report for the COFF file header.
+    pub fn file_header_report(&self) -> crate::report::Report {
         let file_header = match &self.nt_header {
             IMAGE_NT_HEADERS::PE32(h) => &h.FileHeader,
             IMAGE_NT_HEADERS::PE32P(h) => &h.FileHeader,
         };
-        crate::report::file_header_fields(file_header)
+        crate::report::Report::from_fields(
+            "File Header",
+            crate::report::file_header_fields(file_header),
+        )
     }
 
-    /// Key/value rows for the optional header (PE32 or PE32+).
-    pub fn optional_header_report(&self) -> Vec<crate::report::Field> {
-        match &self.nt_header {
+    /// Report for the optional header (PE32 or PE32+).
+    pub fn optional_header_report(&self) -> crate::report::Report {
+        let fields = match &self.nt_header {
             IMAGE_NT_HEADERS::PE32(h) => {
                 crate::report::optional_header32_fields(&h.OptionalHeader)
             }
             IMAGE_NT_HEADERS::PE32P(h) => {
                 crate::report::optional_header64_fields(&h.OptionalHeader)
             }
-        }
+        };
+        crate::report::Report::from_fields("Optional Header", fields)
     }
 
-    /// Multi-column rows for the section table, aligned with
-    /// [`crate::report::SECTION_COLUMNS`].
-    pub fn sections_report(&self) -> Vec<Vec<String>> {
-        self.sections
+    /// Report for the section table.
+    pub fn sections_report(&self) -> crate::report::Report {
+        let rows = self
+            .sections
             .iter()
             .map(crate::report::section_row)
-            .collect()
+            .collect();
+        crate::report::Report::new("Sections", crate::report::SECTION_COLUMNS, rows)
     }
 }
 
