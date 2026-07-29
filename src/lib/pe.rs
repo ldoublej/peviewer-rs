@@ -1,15 +1,16 @@
 use crate::data_source::{DataSource, DataSourceExt, FileDataSource};
 use crate::pe_structs::*;
+use crate::pe_structs_wrapper::Section;
 use std::path::Path;
 
-pub struct PeFile {
+pub struct PeFile<'a> {
     dos_header: IMAGE_DOS_HEADER,
     data_source: Box<dyn DataSource>,
     nt_header: IMAGE_NT_HEADERS,
-    sections: Vec<IMAGE_SECTION_HEADER>,
+    sections: Vec<Section<'a>>,
 }
 
-impl PeFile {
+impl<'a> PeFile<'a> {
     pub fn open_from_datasource(data_source: Box<dyn DataSource>) -> Result<Self, ParseError> {
         let len = data_source.len().unwrap_or(0);
         if len < std::mem::size_of::<IMAGE_DOS_HEADER>() as u64 {
@@ -81,7 +82,10 @@ impl PeFile {
                 .read_struct(current_offset as u64, &mut section_header)
                 .map_err(ParseError::DataSource)?;
             current_offset += sz;
-            sections.push(section_header);
+
+            let section =Section::new(section_header, None);
+
+            sections.push(section);
         }
 
         Ok(Self {
@@ -112,7 +116,7 @@ impl PeFile {
         &self.nt_header
     }
 
-    pub fn sections(&self) -> &Vec<IMAGE_SECTION_HEADER> {
+    pub fn sections(&self) -> &Vec<Section<'a>> {
         &self.sections
     }
 

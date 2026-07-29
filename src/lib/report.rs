@@ -6,7 +6,7 @@
 //! frontend) is responsible for rendering these rows however it likes
 //! (a table, JSON, plain text, ...).
 
-use crate::pe_structs::*;
+use crate::{pe_structs::*, pe_structs_wrapper::Section};
 
 /// A single labelled row in a key/value view.
 #[derive(Clone, Debug)]
@@ -359,7 +359,7 @@ pub const SECTION_COLUMNS: &[&str] = &[
 
 /// One section rendered as a row of already-formatted cells, aligned with
 /// [`SECTION_COLUMNS`].
-pub fn section_row(s: &IMAGE_SECTION_HEADER) -> Vec<String> {
+pub fn section_row(s: &Section) -> Vec<String> {
     vec![
         section_name(&s.Name),
         hex32(s.VirtualAddress),
