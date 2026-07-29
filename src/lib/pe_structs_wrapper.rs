@@ -8,13 +8,13 @@ use std::ops::Deref;
 /// `Characteristics`, ...) are available directly on a `Section` via [`Deref`],
 /// so there is no need to re-declare them here.
 #[derive(Debug)]
-pub struct Section<'a> {
+pub struct Section {
     section_header: IMAGE_SECTION_HEADER,
-    _section_data: Option<&'a [u8]>,
+    _section_data: Option<Vec<u8>>,
 }
 
-impl<'a> Section<'a> {
-    pub fn new(image_section_header: IMAGE_SECTION_HEADER, section_data: Option<&'a [u8]>) -> Self {
+impl Section {
+    pub fn new(image_section_header: IMAGE_SECTION_HEADER, section_data: Option<Vec<u8>>) -> Self {
         Self {
             section_header: image_section_header,
             _section_data: section_data,
@@ -22,7 +22,7 @@ impl<'a> Section<'a> {
     }
 }
 
-impl<'a> Deref for Section<'a> {
+impl Deref for Section {
     type Target = IMAGE_SECTION_HEADER;
 
     fn deref(&self) -> &Self::Target {
@@ -36,13 +36,13 @@ impl<'a> Deref for Section<'a> {
 /// All of the underlying header fields (`e_magic`, `e_lfanew`, ...) are
 /// available directly on a `DosHeader` via [`Deref`].
 #[derive(Debug)]
-pub struct DosHeader<'a> {
+pub struct DosHeader {
     dos_header: IMAGE_DOS_HEADER,
-    _dos_stub: Option<&'a [u8]>,
+    _dos_stub: Option<Vec<u8>>,
 }
 
-impl<'a> DosHeader<'a> {
-    pub fn new(image_dos_header: IMAGE_DOS_HEADER, dos_stub: Option<&'a [u8]>) -> Self {
+impl DosHeader {
+    pub fn new(image_dos_header: IMAGE_DOS_HEADER, dos_stub: Option<Vec<u8>>) -> Self {
         Self {
             dos_header: image_dos_header,
             _dos_stub: dos_stub,
@@ -50,7 +50,7 @@ impl<'a> DosHeader<'a> {
     }
 }
 
-impl<'a> Deref for DosHeader<'a> {
+impl Deref for DosHeader {
     type Target = IMAGE_DOS_HEADER;
 
     fn deref(&self) -> &Self::Target {
@@ -64,13 +64,13 @@ impl<'a> Deref for DosHeader<'a> {
 /// `NtHeaders` [`Deref`]s to the [`IMAGE_NT_HEADERS`] enum, so callers still
 /// match on `PE32` / `PE32P` to reach the file and optional headers.
 #[derive(Debug)]
-pub struct NtHeaders<'a> {
+pub struct NtHeaders {
     nt_headers: IMAGE_NT_HEADERS,
-    _headers_data: Option<&'a [u8]>,
+    _headers_data: Option<Vec<u8>>,
 }
 
-impl<'a> NtHeaders<'a> {
-    pub fn new(image_nt_headers: IMAGE_NT_HEADERS, headers_data: Option<&'a [u8]>) -> Self {
+impl NtHeaders {
+    pub fn new(image_nt_headers: IMAGE_NT_HEADERS, headers_data: Option<Vec<u8>>) -> Self {
         Self {
             nt_headers: image_nt_headers,
             _headers_data: headers_data,
@@ -78,7 +78,7 @@ impl<'a> NtHeaders<'a> {
     }
 }
 
-impl<'a> Deref for NtHeaders<'a> {
+impl Deref for NtHeaders {
     type Target = IMAGE_NT_HEADERS;
 
     fn deref(&self) -> &Self::Target {

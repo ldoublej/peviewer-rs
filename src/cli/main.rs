@@ -167,7 +167,7 @@ fn main() {
 }
 
 /// Open a [`PeFile`] from the selected data source.
-fn open_source<'a>(source: &Source, input: &str) -> Result<PeFile<'a>, String> {
+fn open_source(source: &Source, input: &str) -> Result<PeFile, String> {
     match source {
         Source::File => {
             let path = PathBuf::from(input);

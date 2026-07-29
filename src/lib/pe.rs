@@ -3,14 +3,14 @@ use crate::pe_structs::*;
 use crate::pe_structs_wrapper::{DosHeader, NtHeaders, Section};
 use std::path::Path;
 
-pub struct PeFile<'a> {
-    dos_header: DosHeader<'a>,
+pub struct PeFile {
+    dos_header: DosHeader,
     data_source: Box<dyn DataSource>,
-    nt_header: NtHeaders<'a>,
-    sections: Vec<Section<'a>>,
+    nt_header: NtHeaders,
+    sections: Vec<Section>,
 }
 
-impl<'a> PeFile<'a> {
+impl PeFile {
     pub fn open_from_datasource(data_source: Box<dyn DataSource>) -> Result<Self, ParseError> {
         let len = data_source.len().unwrap_or(0);
         if len < std::mem::size_of::<IMAGE_DOS_HEADER>() as u64 {
@@ -103,15 +103,15 @@ impl<'a> PeFile<'a> {
         self.data_source.as_ref()
     }
 
-    pub fn dos_header(&self) -> &DosHeader<'a> {
+    pub fn dos_header(&self) -> &DosHeader {
         &self.dos_header
     }
 
-    pub fn nt_headers(&self) -> &NtHeaders<'a> {
+    pub fn nt_headers(&self) -> &NtHeaders {
         &self.nt_header
     }
 
-    pub fn sections(&self) -> &Vec<Section<'a>> {
+    pub fn sections(&self) -> &Vec<Section> {
         &self.sections
     }
 
