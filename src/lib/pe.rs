@@ -1,12 +1,12 @@
 use crate::data_source::{DataSource, DataSourceExt, FileDataSource};
 use crate::pe_structs::*;
-use crate::pe_structs_wrapper::Section;
+use crate::pe_structs_wrapper::{DosHeader, NtHeaders, Section};
 use std::path::Path;
 
 pub struct PeFile<'a> {
-    dos_header: IMAGE_DOS_HEADER,
+    dos_header: DosHeader<'a>,
     data_source: Box<dyn DataSource>,
-    nt_header: IMAGE_NT_HEADERS,
+    nt_header: NtHeaders<'a>,
     sections: Vec<Section<'a>>,
 }
 
@@ -66,15 +66,10 @@ impl<'a> PeFile<'a> {
         }
 
         // 加载Section
-        let section_count;
-        match nt_header {
-            IMAGE_NT_HEADERS::PE32P(headers) => {
-                section_count = headers.FileHeader.NumberOfSections;
-            }
-            IMAGE_NT_HEADERS::PE32(headers) => {
-                section_count = headers.FileHeader.NumberOfSections;
-            }
-        }
+        let section_count = match nt_header {
+            IMAGE_NT_HEADERS::PE32P(headers) => headers.FileHeader.NumberOfSections,
+            IMAGE_NT_HEADERS::PE32(headers) => headers.FileHeader.NumberOfSections,
+        };
         let mut sections = Vec::new();
         for _ in 0..section_count {
             let mut section_header: IMAGE_SECTION_HEADER = unsafe { std::mem::zeroed() };
@@ -83,15 +78,15 @@ impl<'a> PeFile<'a> {
                 .map_err(ParseError::DataSource)?;
             current_offset += sz;
 
-            let section =Section::new(section_header, None);
+            let section = Section::new(section_header, None);
 
             sections.push(section);
         }
 
         Ok(Self {
-            dos_header,
+            dos_header: DosHeader::new(dos_header, None),
             data_source,
-            nt_header,
+            nt_header: NtHeaders::new(nt_header, None),
             sections,
         })
     }
@@ -108,11 +103,11 @@ impl<'a> PeFile<'a> {
         self.data_source.as_ref()
     }
 
-    pub fn dos_header(&self) -> &IMAGE_DOS_HEADER {
+    pub fn dos_header(&self) -> &DosHeader<'a> {
         &self.dos_header
     }
 
-    pub fn nt_headers(&self) -> &IMAGE_NT_HEADERS {
+    pub fn nt_headers(&self) -> &NtHeaders<'a> {
         &self.nt_header
     }
 
@@ -135,7 +130,7 @@ impl<'a> PeFile<'a> {
 
     /// Report for the COFF file header.
     pub fn file_header_report(&self) -> crate::report::Report {
-        let file_header = match &self.nt_header {
+        let file_header = match &*self.nt_header {
             IMAGE_NT_HEADERS::PE32(h) => &h.FileHeader,
             IMAGE_NT_HEADERS::PE32P(h) => &h.FileHeader,
         };
@@ -147,7 +142,7 @@ impl<'a> PeFile<'a> {
 
     /// Report for the optional header (PE32 or PE32+).
     pub fn optional_header_report(&self) -> crate::report::Report {
-        let fields = match &self.nt_header {
+        let fields = match &*self.nt_header {
             IMAGE_NT_HEADERS::PE32(h) => {
                 crate::report::optional_header32_fields(&h.OptionalHeader)
             }
