@@ -51,6 +51,10 @@ impl DataSource for FileDataSource {
         self.file.metadata().ok().map(|m| m.len())
     }
 
+    fn is_file_aligned(&self) -> bool {
+        true
+    }
+
     fn read_exact(&self, offset: u64, buf: &mut [u8]) -> Result<usize, DataSourceError> {
         let mut cursor = 0usize;
 

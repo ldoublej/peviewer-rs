@@ -1,6 +1,7 @@
 use clap::{Parser, ValueEnum};
 use comfy_table::presets::UTF8_FULL;
 use comfy_table::{ContentArrangement, Table};
+use iced_x86::{Decoder, DecoderOptions, Formatter, NasmFormatter};
 use pe::PeFile;
 use pe::report::Report;
 use std::path::PathBuf;
@@ -25,8 +26,11 @@ struct Cli {
 
     /// Target for the data source: a file path (`file`), a memory address
     /// (`memory`), a process PID (`process`), or a URL (`url`).
+    ///
+    /// If omitted, the executable's own path is used (i.e. `peviewer-rs`
+    /// parses itself).
     #[arg(value_name = "PATH|ADDR|PID|URL")]
-    input: String,
+    input: Option<String>,
 
     // ---- Content selection ------------------------------------------------
     /// Print the DOS header.
@@ -81,6 +85,14 @@ struct Cli {
     #[arg(long)]
     load_config: bool,
 
+    /// Disassemble the `.text` section.
+    #[arg(long)]
+    disasm: bool,
+
+    /// Maximum number of instructions to disassemble.
+    #[arg(long, default_value_t = 64, value_name = "N")]
+    disasm_limit: usize,
+
     /// Print all available content. Unimplemented directories are skipped.
     #[arg(long)]
     all: bool,
@@ -102,12 +114,26 @@ enum Source {
 fn main() {
     let cli = Cli::parse();
 
-    let pe_file = match open_source(&cli.source, &cli.input) {
+    // Resolve the input target.  If the user did not pass one, default to
+    // the running executable so a bare `peviewer-rs` invocation inspects
+    // itself — useful for quick smoke tests.
+    let input_display: String = match &cli.input {
+        Some(s) => s.clone(),
+        None => match std::env::current_exe() {
+            Ok(p) => p.display().to_string(),
+            Err(e) => {
+                eprintln!("error: no input given and could not resolve current exe: {e}");
+                process::exit(1);
+            }
+        },
+    };
+
+    let pe_file = match open_source(&cli.source, cli.input.as_deref()) {
         Ok(pe) => pe,
         Err(e) => {
             eprintln!(
-                "error: could not open '{}' (source = {:?}): {e}",
-                cli.input, cli.source
+                "error: could not open '{input_display}' (source = {:?}): {e}",
+                cli.source
             );
             process::exit(1);
         }
@@ -129,7 +155,8 @@ fn main() {
         || cli.relocations
         || cli.debug
         || cli.tls
-        || cli.load_config;
+        || cli.load_config
+        || cli.disasm;
     let want = |flag: bool| cli.all || flag || !any_selected;
 
     // Implemented content.
@@ -144,6 +171,12 @@ fn main() {
 
     if want(cli.sections) {
         print_report(pe_file.sections_report());
+    }
+
+    if want(cli.disasm) {
+        if let Err(e) = print_text_disasm(&pe_file, cli.disasm_limit) {
+            eprintln!("error: disassembly failed: {e}");
+        }
     }
 
     // Directories that are not wired up yet. They are only reported when
@@ -166,11 +199,15 @@ fn main() {
     }
 }
 
-/// Open a [`PeFile`] from the selected data source.
-fn open_source(source: &Source, input: &str) -> Result<PeFile, String> {
+/// Open a [`PeFile`] from the selected data source.  When `input` is
+/// `None`, the running executable's path is used.
+fn open_source(source: &Source, input: Option<&str>) -> Result<PeFile, String> {
     match source {
         Source::File => {
-            let path = PathBuf::from(input);
+            let path = match input {
+                Some(s) => PathBuf::from(s),
+                None => std::env::current_exe().map_err(|e| e.to_string())?,
+            };
             PeFile::open_from_file(&path).map_err(|e| e.to_string())
         }
         Source::Memory => Err("memory data source is not yet implemented".into()),
@@ -194,4 +231,39 @@ fn print_report(report: Report) {
 
     println!("=== {} ===", report.title);
     println!("{table}");
+}
+
+// ---------------------------------------------------------------------------
+// Disassembly (CLI-only)
+// ---------------------------------------------------------------------------
+
+/// Print the `.text` section disassembly as plain text, one instruction
+/// per line. Does nothing if the image has no `.text` section.
+fn print_text_disasm(pe_file: &PeFile, limit: usize) -> Result<(), String> {
+    let Some(section) = pe_file.text_section() else {
+        eprintln!("note: no .text section in this image");
+        return Ok(());
+    };
+
+    let bitness: u32 = if pe_file.is_pe32_plus() { 64 } else { 32 };
+    let bytes = section
+        .section_data()
+        .ok_or_else(|| "section has no raw data".to_string())?;
+    let vaddr = section.virtual_address() as u64;
+
+    let mut decoder = Decoder::with_ip(bitness, bytes, vaddr, DecoderOptions::NONE);
+    let mut formatter = NasmFormatter::new();
+    let mut output = String::new();
+    let mut count = 0usize;
+
+    while count < limit && decoder.can_decode() {
+        let ip = decoder.ip();
+        let instr = decoder.decode();
+        output.clear();
+        formatter.format(&instr, &mut output);
+        println!("{ip:016X}  {output}");
+        count += 1;
+    }
+
+    Ok(())
 }

@@ -13,14 +13,22 @@ pub struct PeFile {
 impl PeFile {
     pub fn open_from_datasource(data_source: Box<dyn DataSource>) -> Result<Self, ParseError> {
         let dos_header = DosHeader::parse(&*data_source)?;
-        let nt_start = dos_header.pe_offset() as u64;
+        let nt_start = dos_header.e_lfanew() as u64;
         let nt_headers = NtHeaders::parse(&*data_source, nt_start)?;
 
         let mut section_offset = nt_start + nt_headers.total_size();
-        let count = nt_headers.number_of_sections() as usize;
+        let count = nt_headers.file_header().number_of_sections() as usize;
+        let opt = nt_headers.optional_header();
+        let section_alignment = opt.section_alignment();
+        let file_alignment = opt.file_alignment();
         let mut sections = Vec::with_capacity(count);
         for _ in 0..count {
-            let (section, bytes_read) = Section::parse(&*data_source, section_offset)?;
+            let (section, bytes_read) = Section::parse(
+                &*data_source,
+                section_offset,
+                section_alignment,
+                file_alignment,
+            )?;
             section_offset += bytes_read as u64;
             sections.push(section);
         }
@@ -91,6 +99,23 @@ impl PeFile {
             .map(crate::report::section_row)
             .collect();
         crate::report::Report::new("Sections", crate::report::SECTION_COLUMNS, rows)
+    }
+
+    /// Returns the section named exactly `.text`, if present.
+    pub fn text_section(&self) -> Option<&Section> {
+        self.sections.iter().find(|s| s.name() == ".text")
+    }
+
+    /// The `ImageBase` + `AddressOfEntryPoint` (the entry RVA). Callers
+    /// that want a runtime virtual address add this to the image base
+    /// (which depends on bit width).
+    pub fn address_of_entry_point(&self) -> u32 {
+        self.nt_header.optional_header().address_of_entry_point()
+    }
+
+    /// True if the image is PE32+ (64-bit).
+    pub fn is_pe32_plus(&self) -> bool {
+        self.nt_header.optional_header().is_pe32_plus()
     }
 }
 
@@ -200,8 +225,8 @@ mod tests {
 
         // NT header
         assert_eq!(pe.nt_headers().signature(), 0x00004550);
-        assert!(!pe.nt_headers().is_pe32_plus());
-        assert_eq!(pe.nt_headers().number_of_sections(), 0);
+        assert!(!pe.nt_headers().optional_header().is_pe32_plus());
+        assert_eq!(pe.nt_headers().file_header().number_of_sections(), 0);
 
         // File header
         assert_eq!(pe.nt_headers().file_header().machine(), 0x014C);

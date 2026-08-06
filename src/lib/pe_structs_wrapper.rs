@@ -396,17 +396,7 @@ impl NtHeaders {
             IMAGE_NT_HEADERS::PE32P(h) => h.Signature,
         }
     }
-
-    /// `true` iff the optional header is PE32+ (64-bit).
-    pub fn is_pe32_plus(&self) -> bool {
-        self.optional_header.is_pe32_plus()
-    }
-
-    /// Number of section headers that follow this block.
-    pub fn number_of_sections(&self) -> u16 {
-        self.file_header.number_of_sections()
-    }
-
+    
     /// Total size in bytes of the NT-headers block (signature + file
     /// header + optional header). Used to compute the offset of the
     /// first section header.
@@ -430,7 +420,7 @@ impl NtHeaders {
 
 /// A parsed DOS header. The underlying [`IMAGE_DOS_HEADER`] is
 /// **encapsulated**: external callers obtain its fields through the
-/// public accessor methods ([`DosHeader::pe_offset`], [`DosHeader::magic`], ...).
+/// public accessor methods ([`DosHeader::e_lfanew`], [`DosHeader::magic`], ...).
 #[derive(Debug)]
 pub struct DosHeader {
     dos_header: IMAGE_DOS_HEADER,
@@ -460,7 +450,7 @@ impl DosHeader {
     }
 
     /// The file offset of the NT headers (`e_lfanew`).
-    pub fn pe_offset(&self) -> u32 {
+    pub fn e_lfanew(&self) -> u32 {
         self.dos_header.e_lfanew
     }
 
@@ -495,15 +485,25 @@ impl DosHeader {
 #[derive(Debug)]
 pub struct Section {
     section_header: IMAGE_SECTION_HEADER,
+    section_data: Option<Vec<u8>>
 }
 
 impl Section {
     /// Read one `IMAGE_SECTION_HEADER` at `offset`. Returns the section
     /// plus the number of bytes consumed (always
     /// `size_of::<IMAGE_SECTION_HEADER>()`).
+    ///
+    /// `section_alignment` and `file_alignment` come from the optional
+    /// header; they are used to round the section's on-image / in-file
+    /// size up to a multiple of the alignment. `is_file_aligned` on the
+    /// source picks which size is read: the file-aligned `SizeOfRawData`
+    /// (rounded up to `file_alignment`) or the in-memory `VirtualSize`
+    /// (rounded up to `section_alignment`).
     pub fn parse<T: DataSourceExt + ?Sized>(
         source: &T,
         offset: u64,
+        section_alignment: u32,
+        file_alignment: u32,
     ) -> Result<(Self, usize), ParseError> {
         let size = std::mem::size_of::<IMAGE_SECTION_HEADER>();
         if source.len().unwrap_or(0) < offset + size as u64 {
@@ -516,7 +516,17 @@ impl Section {
             .map_err(ParseError::DataSource)?;
         debug_assert_eq!(sz, size);
 
-        Ok((Self { section_header }, sz))
+        let section_offset = section_header.PointerToRawData as u64;
+        let raw_size = section_header.SizeOfRawData as usize;
+        let virtual_size = section_header.VirtualSize as usize;
+        let section_size = if source.is_file_aligned() {
+            align_up(raw_size, file_alignment as usize)
+        } else {
+            align_up(virtual_size, section_alignment as usize)
+        };
+
+        let raw_section_data = source.read_bytes(section_offset, section_size)?;
+        Ok((Self { section_header, section_data: Some(raw_section_data) }, sz))
     }
 
     /// 8-byte ASCII name, NUL-trimmed.
@@ -524,6 +534,10 @@ impl Section {
         let raw = &self.section_header.Name;
         let end = raw.iter().position(|&b| b == 0).unwrap_or(raw.len());
         String::from_utf8_lossy(&raw[..end]).into_owned()
+    }
+
+    pub fn section_data(&self) -> Option<&Vec<u8>> {
+        self.section_data.as_ref()
     }
 
     pub fn virtual_address(&self) -> u32 {
@@ -552,5 +566,20 @@ impl Section {
     }
     pub fn characteristics(&self) -> u32 {
         self.section_header.Characteristics
+    }
+}
+
+/// Round `value` up to the nearest multiple of `align`. `align` must be
+/// non-zero. Returns `value` unchanged if it is already aligned.
+fn align_up(value: usize, align: usize) -> usize {
+    if align <= 1 {
+        value
+    } else {
+        let rem = value % align;
+        if rem == 0 {
+            value
+        } else {
+            value + (align - rem)
+        }
     }
 }

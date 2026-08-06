@@ -249,7 +249,7 @@ pub fn dos_header_fields(h: &DosHeader) -> Vec<Field> {
         Field::plain("e_oeminfo", hex16(h.e_oeminfo())),
         Field::new(
             "e_lfanew",
-            hex32(h.pe_offset()),
+            hex32(h.e_lfanew()),
             Some("file offset of NT headers".to_string()),
         ),
     ]
