@@ -221,7 +221,7 @@ mod tests {
 
         // DOS header
         assert_eq!(pe.dos_header().magic(), 0x5A4D);
-        assert_eq!(pe.dos_header().pe_offset(), 0x80);
+        assert_eq!(pe.dos_header().e_lfanew(), 0x80);
 
         // NT header
         assert_eq!(pe.nt_headers().signature(), 0x00004550);
