@@ -6,7 +6,31 @@
 //! frontend) is responsible for rendering these rows however it likes
 //! (a table, JSON, plain text, ...).
 
-use crate::{pe_structs::*, pe_structs_wrapper::Section};
+use crate::pe_structs::{
+    IMAGE_DLLCHARACTERISTICS_APPCONTAINER, IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE,
+    IMAGE_DLLCHARACTERISTICS_FORCE_INTEGRITY, IMAGE_DLLCHARACTERISTICS_GUARD_CF,
+    IMAGE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA, IMAGE_DLLCHARACTERISTICS_NX_COMPAT,
+    IMAGE_DLLCHARACTERISTICS_NO_BIND, IMAGE_DLLCHARACTERISTICS_NO_ISOLATION,
+    IMAGE_DLLCHARACTERISTICS_NO_SEH, IMAGE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE,
+    IMAGE_DLLCHARACTERISTICS_WDM_DRIVER, IMAGE_FILE_32BIT_MACHINE,
+    IMAGE_FILE_AGGRESIVE_WS_TRIM, IMAGE_FILE_BYTES_REVERSED_HI, IMAGE_FILE_BYTES_REVERSED_LO,
+    IMAGE_FILE_DEBUG_STRIPPED, IMAGE_FILE_DLL, IMAGE_FILE_EXECUTABLE_IMAGE,
+    IMAGE_FILE_LARGE_ADDRESS_AWARE, IMAGE_FILE_LINE_NUMS_STRIPPED,
+    IMAGE_FILE_LOCAL_SYMS_STRIPPED, IMAGE_FILE_MACHINE_AMD64, IMAGE_FILE_MACHINE_I386,
+    IMAGE_FILE_MACHINE_IA64, IMAGE_FILE_NET_RUN_FROM_SWAP, IMAGE_FILE_RELOCS_STRIPPED,
+    IMAGE_FILE_REMOVABLE_RUN_FROM_SWAP, IMAGE_FILE_SYSTEM, IMAGE_FILE_UP_SYSTEM_ONLY,
+    IMAGE_SCN_CNT_CODE, IMAGE_SCN_CNT_INITIALIZED_DATA, IMAGE_SCN_CNT_UNINITIALIZED_DATA,
+    IMAGE_SCN_GPREL, IMAGE_SCN_LNK_COMDAT, IMAGE_SCN_LNK_INFO, IMAGE_SCN_LNK_NRELOC_OVFL,
+    IMAGE_SCN_LNK_REMOVE, IMAGE_SCN_MEM_DISCARDABLE, IMAGE_SCN_MEM_EXECUTE, IMAGE_SCN_MEM_NOT_CACHED,
+    IMAGE_SCN_MEM_NOT_PAGED, IMAGE_SCN_MEM_READ, IMAGE_SCN_MEM_SHARED, IMAGE_SCN_MEM_WRITE,
+    IMAGE_SUBSYSTEM_EFI_APPLICATION, IMAGE_SUBSYSTEM_EFI_BOOT_SERVICE_DRIVER,
+    IMAGE_SUBSYSTEM_EFI_ROM, IMAGE_SUBSYSTEM_EFI_RUNTIME_DRIVER, IMAGE_SUBSYSTEM_NATIVE,
+    IMAGE_SUBSYSTEM_NATIVE_WINDOWS, IMAGE_SUBSYSTEM_OS2_CUI, IMAGE_SUBSYSTEM_POSIX_CUI,
+    IMAGE_SUBSYSTEM_UNKNOWN, IMAGE_SUBSYSTEM_WINDOWS_BOOT_APPLICATION,
+    IMAGE_SUBSYSTEM_WINDOWS_CE_GUI, IMAGE_SUBSYSTEM_WINDOWS_CUI, IMAGE_SUBSYSTEM_WINDOWS_GUI,
+    IMAGE_SUBSYSTEM_XBOX,
+};
+use crate::pe_structs_wrapper::{DosHeader, FileHeader, OptionalHeader, Section};
 
 /// A single labelled row in a key/value view.
 #[derive(Clone, Debug)]
@@ -85,9 +109,6 @@ fn hex16(v: u16) -> String {
 }
 fn hex32(v: u32) -> String {
     format!("{v:#010X}")
-}
-fn hex64(v: u64) -> String {
-    format!("{v:#018X}")
 }
 
 /// Decode a bitmask into a `A | B | C` string using a table of
@@ -197,42 +218,38 @@ const SECTION_CHARACTERISTICS: &[(u32, &str)] = &[
     (IMAGE_SCN_MEM_WRITE, "MEM_WRITE"),
 ];
 
-/// Read a section's fixed 8-byte name as an ASCII string (trimmed at NUL).
-fn section_name(name: &[u8; IMAGE_SIZEOF_SHORT_NAME]) -> String {
-    let end = name.iter().position(|&b| b == 0).unwrap_or(name.len());
-    String::from_utf8_lossy(&name[..end]).into_owned()
-}
+// (Section::name owns the 8-byte ASCII NUL-trim; no helper here.)
 
 // ---------------------------------------------------------------------------
 // Row builders — DOS header
 // ---------------------------------------------------------------------------
 
-pub fn dos_header_fields(h: &IMAGE_DOS_HEADER) -> Vec<Field> {
-    let magic_note = if h.e_magic == IMAGE_DOS_SIGNATURE {
+pub fn dos_header_fields(h: &DosHeader) -> Vec<Field> {
+    let magic_note = if h.magic() == 0x5A4D {
         Some("\"MZ\"".to_string())
     } else {
         Some("invalid".to_string())
     };
     vec![
-        Field::new("e_magic", hex16(h.e_magic), magic_note),
-        Field::plain("e_cblp", hex16(h.e_cblp)),
-        Field::plain("e_cp", hex16(h.e_cp)),
-        Field::plain("e_crlc", hex16(h.e_crlc)),
-        Field::plain("e_cparhdr", hex16(h.e_cparhdr)),
-        Field::plain("e_minalloc", hex16(h.e_minalloc)),
-        Field::plain("e_maxalloc", hex16(h.e_maxalloc)),
-        Field::plain("e_ss", hex16(h.e_ss)),
-        Field::plain("e_sp", hex16(h.e_sp)),
-        Field::plain("e_csum", hex16(h.e_csum)),
-        Field::plain("e_ip", hex16(h.e_ip)),
-        Field::plain("e_cs", hex16(h.e_cs)),
-        Field::plain("e_lfarlc", hex16(h.e_lfarlc)),
-        Field::plain("e_ovno", hex16(h.e_ovno)),
-        Field::plain("e_oemid", hex16(h.e_oemid)),
-        Field::plain("e_oeminfo", hex16(h.e_oeminfo)),
+        Field::new("e_magic", hex16(h.magic()), magic_note),
+        Field::plain("e_cblp", hex16(h.e_cblp())),
+        Field::plain("e_cp", hex16(h.e_cp())),
+        Field::plain("e_crlc", hex16(h.e_crlc())),
+        Field::plain("e_cparhdr", hex16(h.e_cparhdr())),
+        Field::plain("e_minalloc", hex16(h.e_minalloc())),
+        Field::plain("e_maxalloc", hex16(h.e_maxalloc())),
+        Field::plain("e_ss", hex16(h.e_ss())),
+        Field::plain("e_sp", hex16(h.e_sp())),
+        Field::plain("e_csum", hex16(h.e_csum())),
+        Field::plain("e_ip", hex16(h.e_ip())),
+        Field::plain("e_cs", hex16(h.e_cs())),
+        Field::plain("e_lfarlc", hex16(h.e_lfarlc())),
+        Field::plain("e_ovno", hex16(h.e_ovno())),
+        Field::plain("e_oemid", hex16(h.e_oemid())),
+        Field::plain("e_oeminfo", hex16(h.e_oeminfo())),
         Field::new(
             "e_lfanew",
-            hex32(h.e_lfanew),
+            hex32(h.pe_offset()),
             Some("file offset of NT headers".to_string()),
         ),
     ]
@@ -242,22 +259,22 @@ pub fn dos_header_fields(h: &IMAGE_DOS_HEADER) -> Vec<Field> {
 // Row builders — COFF file header
 // ---------------------------------------------------------------------------
 
-pub fn file_header_fields(h: &IMAGE_FILE_HEADER) -> Vec<Field> {
+pub fn file_header_fields(h: &FileHeader) -> Vec<Field> {
     vec![
         Field::new(
             "Machine",
-            hex16(h.Machine),
-            Some(machine_name(h.Machine).to_string()),
+            hex16(h.machine()),
+            Some(machine_name(h.machine()).to_string()),
         ),
-        Field::plain("NumberOfSections", h.NumberOfSections.to_string()),
-        Field::plain("TimeDateStamp", hex32(h.TimeDateStamp)),
-        Field::plain("PointerToSymbolTable", hex32(h.PointerToSymbolTable)),
-        Field::plain("NumberOfSymbols", h.NumberOfSymbols.to_string()),
-        Field::plain("SizeOfOptionalHeader", hex16(h.SizeOfOptionalHeader)),
+        Field::plain("NumberOfSections", h.number_of_sections().to_string()),
+        Field::plain("TimeDateStamp", hex32(h.time_date_stamp())),
+        Field::plain("PointerToSymbolTable", hex32(h.pointer_to_symbol_table())),
+        Field::plain("NumberOfSymbols", h.number_of_symbols().to_string()),
+        Field::plain("SizeOfOptionalHeader", hex16(h.size_of_optional_header())),
         Field::new(
             "Characteristics",
-            hex16(h.Characteristics),
-            Some(decode_flags(h.Characteristics as u32, FILE_CHARACTERISTICS)),
+            hex16(h.characteristics()),
+            Some(decode_flags(h.characteristics() as u32, FILE_CHARACTERISTICS)),
         ),
     ]
 }
@@ -266,81 +283,79 @@ pub fn file_header_fields(h: &IMAGE_FILE_HEADER) -> Vec<Field> {
 // Row builders — optional header (PE32 / PE32+)
 // ---------------------------------------------------------------------------
 
-pub fn optional_header32_fields(h: &IMAGE_OPTIONAL_HEADER32) -> Vec<Field> {
-    vec![
-        Field::new("Magic", hex16(h.Magic), Some("PE32".to_string())),
-        Field::plain("LinkerVersion", h.LinkerVersion.to_string()),
-        Field::plain("SizeOfCode", hex32(h.SizeOfCode)),
-        Field::plain("SizeOfInitializedData", hex32(h.SizeOfInitializedData)),
-        Field::plain("SizeOfUninitializedData", hex32(h.SizeOfUninitializedData)),
-        Field::plain("AddressOfEntryPoint", hex32(h.AddressOfEntryPoint)),
-        Field::plain("BaseOfCode", hex32(h.BaseOfCode)),
-        Field::plain("BaseOfData", hex32(h.BaseOfData)),
-        Field::plain("ImageBase", hex32(h.ImageBase)),
-        Field::plain("SectionAlignment", hex32(h.SectionAlignment)),
-        Field::plain("FileAlignment", hex32(h.FileAlignment)),
-        Field::plain("OperatingSystemVersion", h.OperatingSystemVersion.to_string()),
-        Field::plain("ImageVersion", h.ImageVersion.to_string()),
-        Field::plain("SubsystemVersion", h.SubsystemVersion.to_string()),
-        Field::plain("Win32VersionValue", hex32(h.Win32VersionValue)),
-        Field::plain("SizeOfImage", hex32(h.SizeOfImage)),
-        Field::plain("SizeOfHeaders", hex32(h.SizeOfHeaders)),
-        Field::plain("CheckSum", hex32(h.CheckSum)),
-        Field::new(
-            "Subsystem",
-            hex16(h.Subsystem),
-            Some(subsystem_name(h.Subsystem).to_string()),
-        ),
-        Field::new(
-            "DllCharacteristics",
-            hex16(h.DllCharacteristics),
-            Some(decode_flags(h.DllCharacteristics as u32, DLL_CHARACTERISTICS)),
-        ),
-        Field::plain("SizeOfStackReserve", hex32(h.SizeOfStackReserve)),
-        Field::plain("SizeOfStackCommit", hex32(h.SizeOfStackCommit)),
-        Field::plain("SizeOfHeapReserve", hex32(h.SizeOfHeapReserve)),
-        Field::plain("SizeOfHeapCommit", hex32(h.SizeOfHeapCommit)),
-        Field::plain("LoaderFlags", hex32(h.LoaderFlags)),
-        Field::plain("NumberOfRvaAndSizes", h.NumberOfRvaAndSizes.to_string()),
-    ]
-}
+pub fn optional_header_fields(h: &OptionalHeader) -> Vec<Field> {
+    let kind_note = if h.is_pe32_plus() { "PE32+" } else { "PE32" };
+    let (linker_major, linker_minor) = h.linker_version();
+    let (os_major, os_minor) = h.operating_system_version();
+    let (img_major, img_minor) = h.image_version();
+    let (subsys_major, subsys_minor) = h.subsystem_version();
 
-pub fn optional_header64_fields(h: &IMAGE_OPTIONAL_HEADER64) -> Vec<Field> {
-    vec![
-        Field::new("Magic", hex16(h.Magic), Some("PE32+".to_string())),
-        Field::plain("LinkerVersion", h.LinkerVersion.to_string()),
-        Field::plain("SizeOfCode", hex32(h.SizeOfCode)),
-        Field::plain("SizeOfInitializedData", hex32(h.SizeOfInitializedData)),
-        Field::plain("SizeOfUninitializedData", hex32(h.SizeOfUninitializedData)),
-        Field::plain("AddressOfEntryPoint", hex32(h.AddressOfEntryPoint)),
-        Field::plain("BaseOfCode", hex32(h.BaseOfCode)),
-        Field::plain("ImageBase", hex64(h.ImageBase)),
-        Field::plain("SectionAlignment", hex32(h.SectionAlignment)),
-        Field::plain("FileAlignment", hex32(h.FileAlignment)),
-        Field::plain("OperatingSystemVersion", h.OperatingSystemVersion.to_string()),
-        Field::plain("ImageVersion", h.ImageVersion.to_string()),
-        Field::plain("SubsystemVersion", h.SubsystemVersion.to_string()),
-        Field::plain("Win32VersionValue", hex32(h.Win32VersionValue)),
-        Field::plain("SizeOfImage", hex32(h.SizeOfImage)),
-        Field::plain("SizeOfHeaders", hex32(h.SizeOfHeaders)),
-        Field::plain("CheckSum", hex32(h.CheckSum)),
-        Field::new(
-            "Subsystem",
-            hex16(h.Subsystem),
-            Some(subsystem_name(h.Subsystem).to_string()),
+    let mut rows = vec![
+        Field::new("Magic", hex16(h.magic()), Some(kind_note.to_string())),
+        Field::plain(
+            "LinkerVersion",
+            format!("{linker_major}.{linker_minor}"),
         ),
-        Field::new(
-            "DllCharacteristics",
-            hex16(h.DllCharacteristics),
-            Some(decode_flags(h.DllCharacteristics as u32, DLL_CHARACTERISTICS)),
-        ),
-        Field::plain("SizeOfStackReserve", hex64(h.SizeOfStackReserve)),
-        Field::plain("SizeOfStackCommit", hex64(h.SizeOfStackCommit)),
-        Field::plain("SizeOfHeapReserve", hex64(h.SizeOfHeapReserve)),
-        Field::plain("SizeOfHeapCommit", hex64(h.SizeOfHeapCommit)),
-        Field::plain("LoaderFlags", hex32(h.LoaderFlags)),
-        Field::plain("NumberOfRvaAndSizes", h.NumberOfRvaAndSizes.to_string()),
-    ]
+        Field::plain("SizeOfCode", hex32(h.size_of_code())),
+        Field::plain("SizeOfInitializedData", hex32(h.size_of_initialized_data())),
+        Field::plain("SizeOfUninitializedData", hex32(h.size_of_uninitialized_data())),
+        Field::plain("AddressOfEntryPoint", hex32(h.address_of_entry_point())),
+        Field::plain("BaseOfCode", hex32(h.base_of_code())),
+    ];
+    if let Some(b) = h.base_of_data() {
+        rows.push(Field::plain("BaseOfData", hex32(b)));
+    }
+    rows.push(Field::plain("ImageBase", h.image_base().to_hex_string()));
+    rows.push(Field::plain("SectionAlignment", hex32(h.section_alignment())));
+    rows.push(Field::plain("FileAlignment", hex32(h.file_alignment())));
+    rows.push(Field::plain(
+        "OperatingSystemVersion",
+        format!("{os_major}.{os_minor}"),
+    ));
+    rows.push(Field::plain(
+        "ImageVersion",
+        format!("{img_major}.{img_minor}"),
+    ));
+    rows.push(Field::plain(
+        "SubsystemVersion",
+        format!("{subsys_major}.{subsys_minor}"),
+    ));
+    rows.push(Field::plain("Win32VersionValue", hex32(h.win32_version_value())));
+    rows.push(Field::plain("SizeOfImage", hex32(h.size_of_image())));
+    rows.push(Field::plain("SizeOfHeaders", hex32(h.size_of_headers())));
+    rows.push(Field::plain("CheckSum", hex32(h.check_sum())));
+    rows.push(Field::new(
+        "Subsystem",
+        hex16(h.subsystem()),
+        Some(subsystem_name(h.subsystem()).to_string()),
+    ));
+    rows.push(Field::new(
+        "DllCharacteristics",
+        hex16(h.dll_characteristics()),
+        Some(decode_flags(h.dll_characteristics() as u32, DLL_CHARACTERISTICS)),
+    ));
+    rows.push(Field::plain(
+        "SizeOfStackReserve",
+        h.size_of_stack_reserve().to_hex_string(),
+    ));
+    rows.push(Field::plain(
+        "SizeOfStackCommit",
+        h.size_of_stack_commit().to_hex_string(),
+    ));
+    rows.push(Field::plain(
+        "SizeOfHeapReserve",
+        h.size_of_heap_reserve().to_hex_string(),
+    ));
+    rows.push(Field::plain(
+        "SizeOfHeapCommit",
+        h.size_of_heap_commit().to_hex_string(),
+    ));
+    rows.push(Field::plain("LoaderFlags", hex32(h.loader_flags())));
+    rows.push(Field::plain(
+        "NumberOfRvaAndSizes",
+        h.number_of_rva_and_sizes().to_string(),
+    ));
+    rows
 }
 
 // ---------------------------------------------------------------------------
@@ -361,11 +376,11 @@ pub const SECTION_COLUMNS: &[&str] = &[
 /// [`SECTION_COLUMNS`].
 pub fn section_row(s: &Section) -> Vec<String> {
     vec![
-        section_name(&s.Name),
-        hex32(s.VirtualAddress),
-        hex32(s.VirtualSize),
-        hex32(s.SizeOfRawData),
-        hex32(s.PointerToRawData),
-        decode_flags(s.Characteristics, SECTION_CHARACTERISTICS),
+        s.name(),
+        hex32(s.virtual_address()),
+        hex32(s.virtual_size()),
+        hex32(s.raw_size()),
+        hex32(s.raw_offset()),
+        decode_flags(s.characteristics(), SECTION_CHARACTERISTICS),
     ]
 }

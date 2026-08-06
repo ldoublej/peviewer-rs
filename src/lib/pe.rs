@@ -1,92 +1,33 @@
-use crate::data_source::{DataSource, DataSourceExt, FileDataSource};
-use crate::pe_structs::*;
+use crate::data_source::{DataSource, FileDataSource};
 use crate::pe_structs_wrapper::{DosHeader, NtHeaders, Section};
 use std::path::Path;
 
 pub struct PeFile {
-    dos_header: DosHeader,
     data_source: Box<dyn DataSource>,
+    dos_header: DosHeader,
     nt_header: NtHeaders,
     sections: Vec<Section>,
 }
 
 impl PeFile {
     pub fn open_from_datasource(data_source: Box<dyn DataSource>) -> Result<Self, ParseError> {
-        let len = data_source.len().unwrap_or(0);
-        if len < std::mem::size_of::<IMAGE_DOS_HEADER>() as u64 {
-            return Err(ParseError::TooSmall(len));
-        }
+        let dos_header = DosHeader::parse(&*data_source)?;
+        let nt_start = dos_header.pe_offset() as u64;
+        let nt_headers = NtHeaders::parse(&*data_source, nt_start)?;
 
-        // 读取解析 IMAGE_DOS_HEADER头
-        let mut dos_header = IMAGE_DOS_HEADER::default();
-        data_source
-            .read_struct(0, &mut dos_header)
-            .map_err(ParseError::DataSource)?;
-        // DOS magic is "MZ" → 0x5A4D in little-endian u16
-        if dos_header.e_magic != IMAGE_DOS_SIGNATURE {
-            return Err(ParseError::InvalidMagic {
-                expected: "MZ",
-                found: format!("{:#06X}", dos_header.e_magic),
-            });
-        }
-
-        // 预先读取 IMAGE_OPTIONAL_HEADER 中的 Magic 字段，判断PE类型（PE32 or PE32P）
-        let mut current_offset: usize = dos_header.e_lfanew as usize;
-        let magic_offset =
-            current_offset + std::mem::size_of::<u32>() + std::mem::size_of::<IMAGE_FILE_HEADER>();
-        let magic = data_source
-            .read_u16(magic_offset as u64)
-            .map_err(ParseError::DataSource)?;
-
-        // 根据 IMAGE_OPTIONAL_HEADER 中的 Magic 决定 IMAGE_NT_HEADERS 的类型
-        let nt_header: IMAGE_NT_HEADERS;
-        match magic {
-            IMAGE_NT_OPTIONAL_HDR64_MAGIC => {
-                let mut nt_header64: IMAGE_NT_HEADERS64 = unsafe { std::mem::zeroed() };
-                let sz = data_source
-                    .read_struct(current_offset as u64, &mut nt_header64)
-                    .map_err(ParseError::DataSource)?;
-                current_offset += sz;
-                nt_header = IMAGE_NT_HEADERS::PE32P(nt_header64);
-            }
-            IMAGE_NT_OPTIONAL_HDR32_MAGIC => {
-                let mut nt_header32: IMAGE_NT_HEADERS32 = unsafe { std::mem::zeroed() };
-                let sz = data_source
-                    .read_struct(current_offset as u64, &mut nt_header32)
-                    .map_err(ParseError::DataSource)?;
-                current_offset += sz;
-                nt_header = IMAGE_NT_HEADERS::PE32(nt_header32);
-            }
-            _ => {
-                return Err(ParseError::InvalidMagic {
-                    expected: "0x10b or 0x20b 0r 0x107",
-                    found: format!("{:#06X}", magic),
-                });
-            }
-        }
-
-        // 加载Section
-        let section_count = match nt_header {
-            IMAGE_NT_HEADERS::PE32P(headers) => headers.FileHeader.NumberOfSections,
-            IMAGE_NT_HEADERS::PE32(headers) => headers.FileHeader.NumberOfSections,
-        };
-        let mut sections = Vec::new();
-        for _ in 0..section_count {
-            let mut section_header: IMAGE_SECTION_HEADER = unsafe { std::mem::zeroed() };
-            let sz = data_source
-                .read_struct(current_offset as u64, &mut section_header)
-                .map_err(ParseError::DataSource)?;
-            current_offset += sz;
-
-            let section = Section::new(section_header, None);
-
+        let mut section_offset = nt_start + nt_headers.total_size();
+        let count = nt_headers.number_of_sections() as usize;
+        let mut sections = Vec::with_capacity(count);
+        for _ in 0..count {
+            let (section, bytes_read) = Section::parse(&*data_source, section_offset)?;
+            section_offset += bytes_read as u64;
             sections.push(section);
         }
 
         Ok(Self {
-            dos_header: DosHeader::new(dos_header, None),
+            dos_header,
             data_source,
-            nt_header: NtHeaders::new(nt_header, None),
+            nt_header: nt_headers,
             sections,
         })
     }
@@ -130,27 +71,18 @@ impl PeFile {
 
     /// Report for the COFF file header.
     pub fn file_header_report(&self) -> crate::report::Report {
-        let file_header = match &*self.nt_header {
-            IMAGE_NT_HEADERS::PE32(h) => &h.FileHeader,
-            IMAGE_NT_HEADERS::PE32P(h) => &h.FileHeader,
-        };
         crate::report::Report::from_fields(
             "File Header",
-            crate::report::file_header_fields(file_header),
+            crate::report::file_header_fields(self.nt_header.file_header()),
         )
     }
 
     /// Report for the optional header (PE32 or PE32+).
     pub fn optional_header_report(&self) -> crate::report::Report {
-        let fields = match &*self.nt_header {
-            IMAGE_NT_HEADERS::PE32(h) => {
-                crate::report::optional_header32_fields(&h.OptionalHeader)
-            }
-            IMAGE_NT_HEADERS::PE32P(h) => {
-                crate::report::optional_header64_fields(&h.OptionalHeader)
-            }
-        };
-        crate::report::Report::from_fields("Optional Header", fields)
+        crate::report::Report::from_fields(
+            "Optional Header",
+            crate::report::optional_header_fields(self.nt_header.optional_header()),
+        )
     }
 
     /// Report for the section table.
