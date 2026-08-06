@@ -246,11 +246,13 @@ impl<T: DataSource + ?Sized> DataSourceExt for T {}
 /// Shared read logic for contiguous byte buffers.
 fn slice_read_exact(data: &[u8], offset: u64, buf: &mut [u8]) -> Result<(), DataSourceError> {
     let start = offset as usize;
-    let end = start.checked_add(buf.len()).ok_or(DataSourceError::OutOfBounds {
-        offset,
-        length: buf.len(),
-        source_len: Some(data.len() as u64),
-    })?;
+    let end = start
+        .checked_add(buf.len())
+        .ok_or(DataSourceError::OutOfBounds {
+            offset,
+            length: buf.len(),
+            source_len: Some(data.len() as u64),
+        })?;
 
     if end > data.len() {
         return Err(DataSourceError::OutOfBounds {

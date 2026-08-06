@@ -2,11 +2,10 @@ use crate::data_source::DataSourceExt;
 use crate::pe::ParseError;
 use crate::pe_structs::{
     IMAGE_DOS_HEADER, IMAGE_DOS_SIGNATURE, IMAGE_FILE_HEADER, IMAGE_NT_HEADERS,
-    IMAGE_NT_HEADERS32, IMAGE_NT_HEADERS64, IMAGE_NT_HEADERS_SIGNATURE, IMAGE_NT_OPTIONAL_HDR32_MAGIC,
-    IMAGE_NT_OPTIONAL_HDR64_MAGIC, IMAGE_OPTIONAL_HEADER32, IMAGE_OPTIONAL_HEADER64,
-    IMAGE_SECTION_HEADER,
+    IMAGE_NT_HEADERS_SIGNATURE, IMAGE_NT_HEADERS32, IMAGE_NT_HEADERS64,
+    IMAGE_NT_OPTIONAL_HDR32_MAGIC, IMAGE_NT_OPTIONAL_HDR64_MAGIC, IMAGE_OPTIONAL_HEADER32,
+    IMAGE_OPTIONAL_HEADER64, IMAGE_SECTION_HEADER,
 };
-
 
 // ---------------------------------------------------------------------------
 // ImageBase
@@ -35,7 +34,6 @@ impl ImageBase {
         format!("{:#018X}", self.as_u64())
     }
 }
-
 
 // ---------------------------------------------------------------------------
 // FileHeader
@@ -74,7 +72,6 @@ impl FileHeader {
         self.file_header.Characteristics
     }
 }
-
 
 // ---------------------------------------------------------------------------
 // OptionalHeader
@@ -288,7 +285,6 @@ impl OptionalHeader {
     }
 }
 
-
 // ---------------------------------------------------------------------------
 // NtHeaders
 // ---------------------------------------------------------------------------
@@ -312,10 +308,7 @@ impl NtHeaders {
     /// Parse the NT-headers block starting at `offset`. Validates the
     /// `PE\0\0` signature and the optional-header magic, then dispatches
     /// to PE32 or PE32+.
-    pub fn parse<T: DataSourceExt + ?Sized>(
-        source: &T,
-        offset: u64,
-    ) -> Result<Self, ParseError> {
+    pub fn parse<T: DataSourceExt + ?Sized>(source: &T, offset: u64) -> Result<Self, ParseError> {
         let min_size = std::mem::size_of::<u32>() + std::mem::size_of::<IMAGE_FILE_HEADER>();
         if source.len().unwrap_or(0) < offset + min_size as u64 {
             return Err(ParseError::TooSmall(source.len().unwrap_or(0)));
@@ -377,9 +370,9 @@ impl NtHeaders {
             }
         };
 
-        let nt_headers_size =
-            (4 + std::mem::size_of::<IMAGE_FILE_HEADER>() + file_header.SizeOfOptionalHeader as usize)
-                as u16;
+        let nt_headers_size = (4
+            + std::mem::size_of::<IMAGE_FILE_HEADER>()
+            + file_header.SizeOfOptionalHeader as usize) as u16;
 
         Ok(Self {
             nt_headers,
@@ -396,7 +389,7 @@ impl NtHeaders {
             IMAGE_NT_HEADERS::PE32P(h) => h.Signature,
         }
     }
-    
+
     /// Total size in bytes of the NT-headers block (signature + file
     /// header + optional header). Used to compute the offset of the
     /// first section header.
@@ -412,7 +405,6 @@ impl NtHeaders {
         &self.optional_header
     }
 }
-
 
 // ---------------------------------------------------------------------------
 // DosHeader
@@ -459,23 +451,52 @@ impl DosHeader {
         self.dos_header.e_magic
     }
 
-    pub fn e_cblp(&self) -> u16 { self.dos_header.e_cblp }
-    pub fn e_cp(&self) -> u16 { self.dos_header.e_cp }
-    pub fn e_crlc(&self) -> u16 { self.dos_header.e_crlc }
-    pub fn e_cparhdr(&self) -> u16 { self.dos_header.e_cparhdr }
-    pub fn e_minalloc(&self) -> u16 { self.dos_header.e_minalloc }
-    pub fn e_maxalloc(&self) -> u16 { self.dos_header.e_maxalloc }
-    pub fn e_ss(&self) -> u16 { self.dos_header.e_ss }
-    pub fn e_sp(&self) -> u16 { self.dos_header.e_sp }
-    pub fn e_csum(&self) -> u16 { self.dos_header.e_csum }
-    pub fn e_ip(&self) -> u16 { self.dos_header.e_ip }
-    pub fn e_cs(&self) -> u16 { self.dos_header.e_cs }
-    pub fn e_lfarlc(&self) -> u16 { self.dos_header.e_lfarlc }
-    pub fn e_ovno(&self) -> u16 { self.dos_header.e_ovno }
-    pub fn e_oemid(&self) -> u16 { self.dos_header.e_oemid }
-    pub fn e_oeminfo(&self) -> u16 { self.dos_header.e_oeminfo }
+    pub fn e_cblp(&self) -> u16 {
+        self.dos_header.e_cblp
+    }
+    pub fn e_cp(&self) -> u16 {
+        self.dos_header.e_cp
+    }
+    pub fn e_crlc(&self) -> u16 {
+        self.dos_header.e_crlc
+    }
+    pub fn e_cparhdr(&self) -> u16 {
+        self.dos_header.e_cparhdr
+    }
+    pub fn e_minalloc(&self) -> u16 {
+        self.dos_header.e_minalloc
+    }
+    pub fn e_maxalloc(&self) -> u16 {
+        self.dos_header.e_maxalloc
+    }
+    pub fn e_ss(&self) -> u16 {
+        self.dos_header.e_ss
+    }
+    pub fn e_sp(&self) -> u16 {
+        self.dos_header.e_sp
+    }
+    pub fn e_csum(&self) -> u16 {
+        self.dos_header.e_csum
+    }
+    pub fn e_ip(&self) -> u16 {
+        self.dos_header.e_ip
+    }
+    pub fn e_cs(&self) -> u16 {
+        self.dos_header.e_cs
+    }
+    pub fn e_lfarlc(&self) -> u16 {
+        self.dos_header.e_lfarlc
+    }
+    pub fn e_ovno(&self) -> u16 {
+        self.dos_header.e_ovno
+    }
+    pub fn e_oemid(&self) -> u16 {
+        self.dos_header.e_oemid
+    }
+    pub fn e_oeminfo(&self) -> u16 {
+        self.dos_header.e_oeminfo
+    }
 }
-
 
 // ---------------------------------------------------------------------------
 // Section
@@ -485,7 +506,7 @@ impl DosHeader {
 #[derive(Debug)]
 pub struct Section {
     section_header: IMAGE_SECTION_HEADER,
-    section_data: Option<Vec<u8>>
+    section_data: Option<Vec<u8>>,
 }
 
 impl Section {
@@ -526,7 +547,13 @@ impl Section {
         };
 
         let raw_section_data = source.read_bytes(section_offset, section_size)?;
-        Ok((Self { section_header, section_data: Some(raw_section_data) }, sz))
+        Ok((
+            Self {
+                section_header,
+                section_data: Some(raw_section_data),
+            },
+            sz,
+        ))
     }
 
     /// 8-byte ASCII name, NUL-trimmed.

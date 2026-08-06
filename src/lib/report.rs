@@ -9,26 +9,25 @@
 use crate::pe_structs::{
     IMAGE_DLLCHARACTERISTICS_APPCONTAINER, IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE,
     IMAGE_DLLCHARACTERISTICS_FORCE_INTEGRITY, IMAGE_DLLCHARACTERISTICS_GUARD_CF,
-    IMAGE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA, IMAGE_DLLCHARACTERISTICS_NX_COMPAT,
-    IMAGE_DLLCHARACTERISTICS_NO_BIND, IMAGE_DLLCHARACTERISTICS_NO_ISOLATION,
-    IMAGE_DLLCHARACTERISTICS_NO_SEH, IMAGE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE,
-    IMAGE_DLLCHARACTERISTICS_WDM_DRIVER, IMAGE_FILE_32BIT_MACHINE,
-    IMAGE_FILE_AGGRESIVE_WS_TRIM, IMAGE_FILE_BYTES_REVERSED_HI, IMAGE_FILE_BYTES_REVERSED_LO,
-    IMAGE_FILE_DEBUG_STRIPPED, IMAGE_FILE_DLL, IMAGE_FILE_EXECUTABLE_IMAGE,
-    IMAGE_FILE_LARGE_ADDRESS_AWARE, IMAGE_FILE_LINE_NUMS_STRIPPED,
-    IMAGE_FILE_LOCAL_SYMS_STRIPPED, IMAGE_FILE_MACHINE_AMD64, IMAGE_FILE_MACHINE_I386,
-    IMAGE_FILE_MACHINE_IA64, IMAGE_FILE_NET_RUN_FROM_SWAP, IMAGE_FILE_RELOCS_STRIPPED,
-    IMAGE_FILE_REMOVABLE_RUN_FROM_SWAP, IMAGE_FILE_SYSTEM, IMAGE_FILE_UP_SYSTEM_ONLY,
-    IMAGE_SCN_CNT_CODE, IMAGE_SCN_CNT_INITIALIZED_DATA, IMAGE_SCN_CNT_UNINITIALIZED_DATA,
-    IMAGE_SCN_GPREL, IMAGE_SCN_LNK_COMDAT, IMAGE_SCN_LNK_INFO, IMAGE_SCN_LNK_NRELOC_OVFL,
-    IMAGE_SCN_LNK_REMOVE, IMAGE_SCN_MEM_DISCARDABLE, IMAGE_SCN_MEM_EXECUTE, IMAGE_SCN_MEM_NOT_CACHED,
-    IMAGE_SCN_MEM_NOT_PAGED, IMAGE_SCN_MEM_READ, IMAGE_SCN_MEM_SHARED, IMAGE_SCN_MEM_WRITE,
-    IMAGE_SUBSYSTEM_EFI_APPLICATION, IMAGE_SUBSYSTEM_EFI_BOOT_SERVICE_DRIVER,
-    IMAGE_SUBSYSTEM_EFI_ROM, IMAGE_SUBSYSTEM_EFI_RUNTIME_DRIVER, IMAGE_SUBSYSTEM_NATIVE,
-    IMAGE_SUBSYSTEM_NATIVE_WINDOWS, IMAGE_SUBSYSTEM_OS2_CUI, IMAGE_SUBSYSTEM_POSIX_CUI,
-    IMAGE_SUBSYSTEM_UNKNOWN, IMAGE_SUBSYSTEM_WINDOWS_BOOT_APPLICATION,
-    IMAGE_SUBSYSTEM_WINDOWS_CE_GUI, IMAGE_SUBSYSTEM_WINDOWS_CUI, IMAGE_SUBSYSTEM_WINDOWS_GUI,
-    IMAGE_SUBSYSTEM_XBOX,
+    IMAGE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA, IMAGE_DLLCHARACTERISTICS_NO_BIND,
+    IMAGE_DLLCHARACTERISTICS_NO_ISOLATION, IMAGE_DLLCHARACTERISTICS_NO_SEH,
+    IMAGE_DLLCHARACTERISTICS_NX_COMPAT, IMAGE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE,
+    IMAGE_DLLCHARACTERISTICS_WDM_DRIVER, IMAGE_FILE_32BIT_MACHINE, IMAGE_FILE_AGGRESIVE_WS_TRIM,
+    IMAGE_FILE_BYTES_REVERSED_HI, IMAGE_FILE_BYTES_REVERSED_LO, IMAGE_FILE_DEBUG_STRIPPED,
+    IMAGE_FILE_DLL, IMAGE_FILE_EXECUTABLE_IMAGE, IMAGE_FILE_LARGE_ADDRESS_AWARE,
+    IMAGE_FILE_LINE_NUMS_STRIPPED, IMAGE_FILE_LOCAL_SYMS_STRIPPED, IMAGE_FILE_MACHINE_AMD64,
+    IMAGE_FILE_MACHINE_I386, IMAGE_FILE_MACHINE_IA64, IMAGE_FILE_NET_RUN_FROM_SWAP,
+    IMAGE_FILE_RELOCS_STRIPPED, IMAGE_FILE_REMOVABLE_RUN_FROM_SWAP, IMAGE_FILE_SYSTEM,
+    IMAGE_FILE_UP_SYSTEM_ONLY, IMAGE_SCN_CNT_CODE, IMAGE_SCN_CNT_INITIALIZED_DATA,
+    IMAGE_SCN_CNT_UNINITIALIZED_DATA, IMAGE_SCN_GPREL, IMAGE_SCN_LNK_COMDAT, IMAGE_SCN_LNK_INFO,
+    IMAGE_SCN_LNK_NRELOC_OVFL, IMAGE_SCN_LNK_REMOVE, IMAGE_SCN_MEM_DISCARDABLE,
+    IMAGE_SCN_MEM_EXECUTE, IMAGE_SCN_MEM_NOT_CACHED, IMAGE_SCN_MEM_NOT_PAGED, IMAGE_SCN_MEM_READ,
+    IMAGE_SCN_MEM_SHARED, IMAGE_SCN_MEM_WRITE, IMAGE_SUBSYSTEM_EFI_APPLICATION,
+    IMAGE_SUBSYSTEM_EFI_BOOT_SERVICE_DRIVER, IMAGE_SUBSYSTEM_EFI_ROM,
+    IMAGE_SUBSYSTEM_EFI_RUNTIME_DRIVER, IMAGE_SUBSYSTEM_NATIVE, IMAGE_SUBSYSTEM_NATIVE_WINDOWS,
+    IMAGE_SUBSYSTEM_OS2_CUI, IMAGE_SUBSYSTEM_POSIX_CUI, IMAGE_SUBSYSTEM_UNKNOWN,
+    IMAGE_SUBSYSTEM_WINDOWS_BOOT_APPLICATION, IMAGE_SUBSYSTEM_WINDOWS_CE_GUI,
+    IMAGE_SUBSYSTEM_WINDOWS_CUI, IMAGE_SUBSYSTEM_WINDOWS_GUI, IMAGE_SUBSYSTEM_XBOX,
 };
 use crate::pe_structs_wrapper::{DosHeader, FileHeader, OptionalHeader, Section};
 
@@ -84,13 +83,7 @@ impl Report {
     pub fn from_fields(title: impl Into<String>, fields: Vec<Field>) -> Self {
         let rows = fields
             .into_iter()
-            .map(|f| {
-                vec![
-                    f.name.to_string(),
-                    f.value,
-                    f.note.unwrap_or_default(),
-                ]
-            })
+            .map(|f| vec![f.name.to_string(), f.value, f.note.unwrap_or_default()])
             .collect();
         Self {
             title: title.into(),
@@ -176,7 +169,10 @@ const FILE_CHARACTERISTICS: &[(u32, &str)] = &[
     (IMAGE_FILE_BYTES_REVERSED_LO as u32, "BYTES_REVERSED_LO"),
     (IMAGE_FILE_32BIT_MACHINE as u32, "32BIT_MACHINE"),
     (IMAGE_FILE_DEBUG_STRIPPED as u32, "DEBUG_STRIPPED"),
-    (IMAGE_FILE_REMOVABLE_RUN_FROM_SWAP as u32, "REMOVABLE_RUN_FROM_SWAP"),
+    (
+        IMAGE_FILE_REMOVABLE_RUN_FROM_SWAP as u32,
+        "REMOVABLE_RUN_FROM_SWAP",
+    ),
     (IMAGE_FILE_NET_RUN_FROM_SWAP as u32, "NET_RUN_FROM_SWAP"),
     (IMAGE_FILE_SYSTEM as u32, "SYSTEM"),
     (IMAGE_FILE_DLL as u32, "DLL"),
@@ -186,9 +182,15 @@ const FILE_CHARACTERISTICS: &[(u32, &str)] = &[
 
 /// `IMAGE_DLLCHARACTERISTICS_*` of the optional header.
 const DLL_CHARACTERISTICS: &[(u32, &str)] = &[
-    (IMAGE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA as u32, "HIGH_ENTROPY_VA"),
+    (
+        IMAGE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA as u32,
+        "HIGH_ENTROPY_VA",
+    ),
     (IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE as u32, "DYNAMIC_BASE"),
-    (IMAGE_DLLCHARACTERISTICS_FORCE_INTEGRITY as u32, "FORCE_INTEGRITY"),
+    (
+        IMAGE_DLLCHARACTERISTICS_FORCE_INTEGRITY as u32,
+        "FORCE_INTEGRITY",
+    ),
     (IMAGE_DLLCHARACTERISTICS_NX_COMPAT as u32, "NX_COMPAT"),
     (IMAGE_DLLCHARACTERISTICS_NO_ISOLATION as u32, "NO_ISOLATION"),
     (IMAGE_DLLCHARACTERISTICS_NO_SEH as u32, "NO_SEH"),
@@ -196,7 +198,10 @@ const DLL_CHARACTERISTICS: &[(u32, &str)] = &[
     (IMAGE_DLLCHARACTERISTICS_APPCONTAINER as u32, "APPCONTAINER"),
     (IMAGE_DLLCHARACTERISTICS_WDM_DRIVER as u32, "WDM_DRIVER"),
     (IMAGE_DLLCHARACTERISTICS_GUARD_CF as u32, "GUARD_CF"),
-    (IMAGE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE as u32, "TERMINAL_SERVER_AWARE"),
+    (
+        IMAGE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE as u32,
+        "TERMINAL_SERVER_AWARE",
+    ),
 ];
 
 /// `IMAGE_SCN_*` section characteristics (the meaningful, non-alignment bits).
@@ -274,7 +279,10 @@ pub fn file_header_fields(h: &FileHeader) -> Vec<Field> {
         Field::new(
             "Characteristics",
             hex16(h.characteristics()),
-            Some(decode_flags(h.characteristics() as u32, FILE_CHARACTERISTICS)),
+            Some(decode_flags(
+                h.characteristics() as u32,
+                FILE_CHARACTERISTICS,
+            )),
         ),
     ]
 }
@@ -292,13 +300,13 @@ pub fn optional_header_fields(h: &OptionalHeader) -> Vec<Field> {
 
     let mut rows = vec![
         Field::new("Magic", hex16(h.magic()), Some(kind_note.to_string())),
-        Field::plain(
-            "LinkerVersion",
-            format!("{linker_major}.{linker_minor}"),
-        ),
+        Field::plain("LinkerVersion", format!("{linker_major}.{linker_minor}")),
         Field::plain("SizeOfCode", hex32(h.size_of_code())),
         Field::plain("SizeOfInitializedData", hex32(h.size_of_initialized_data())),
-        Field::plain("SizeOfUninitializedData", hex32(h.size_of_uninitialized_data())),
+        Field::plain(
+            "SizeOfUninitializedData",
+            hex32(h.size_of_uninitialized_data()),
+        ),
         Field::plain("AddressOfEntryPoint", hex32(h.address_of_entry_point())),
         Field::plain("BaseOfCode", hex32(h.base_of_code())),
     ];
@@ -306,7 +314,10 @@ pub fn optional_header_fields(h: &OptionalHeader) -> Vec<Field> {
         rows.push(Field::plain("BaseOfData", hex32(b)));
     }
     rows.push(Field::plain("ImageBase", h.image_base().to_hex_string()));
-    rows.push(Field::plain("SectionAlignment", hex32(h.section_alignment())));
+    rows.push(Field::plain(
+        "SectionAlignment",
+        hex32(h.section_alignment()),
+    ));
     rows.push(Field::plain("FileAlignment", hex32(h.file_alignment())));
     rows.push(Field::plain(
         "OperatingSystemVersion",
@@ -320,7 +331,10 @@ pub fn optional_header_fields(h: &OptionalHeader) -> Vec<Field> {
         "SubsystemVersion",
         format!("{subsys_major}.{subsys_minor}"),
     ));
-    rows.push(Field::plain("Win32VersionValue", hex32(h.win32_version_value())));
+    rows.push(Field::plain(
+        "Win32VersionValue",
+        hex32(h.win32_version_value()),
+    ));
     rows.push(Field::plain("SizeOfImage", hex32(h.size_of_image())));
     rows.push(Field::plain("SizeOfHeaders", hex32(h.size_of_headers())));
     rows.push(Field::plain("CheckSum", hex32(h.check_sum())));
@@ -332,7 +346,10 @@ pub fn optional_header_fields(h: &OptionalHeader) -> Vec<Field> {
     rows.push(Field::new(
         "DllCharacteristics",
         hex16(h.dll_characteristics()),
-        Some(decode_flags(h.dll_characteristics() as u32, DLL_CHARACTERISTICS)),
+        Some(decode_flags(
+            h.dll_characteristics() as u32,
+            DLL_CHARACTERISTICS,
+        )),
     ));
     rows.push(Field::plain(
         "SizeOfStackReserve",
