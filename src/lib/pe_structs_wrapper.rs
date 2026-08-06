@@ -306,7 +306,6 @@ pub struct NtHeaders {
     nt_headers_size: u16,
     file_header: FileHeader,
     optional_header: OptionalHeader,
-    _headers_data: Option<Vec<u8>>,
 }
 
 impl NtHeaders {
@@ -387,7 +386,6 @@ impl NtHeaders {
             nt_headers_size,
             file_header: FileHeader::new(file_header),
             optional_header,
-            _headers_data: None,
         })
     }
 
@@ -430,15 +428,12 @@ impl NtHeaders {
 // DosHeader
 // ---------------------------------------------------------------------------
 
-/// A parsed DOS header plus, optionally, the DOS stub bytes that follow it.
-///
-/// The underlying [`IMAGE_DOS_HEADER`] is **encapsulated**: external callers
-/// obtain its fields through the public accessor methods
-/// ([`DosHeader::pe_offset`], [`DosHeader::magic`], ...).
+/// A parsed DOS header. The underlying [`IMAGE_DOS_HEADER`] is
+/// **encapsulated**: external callers obtain its fields through the
+/// public accessor methods ([`DosHeader::pe_offset`], [`DosHeader::magic`], ...).
 #[derive(Debug)]
 pub struct DosHeader {
     dos_header: IMAGE_DOS_HEADER,
-    _dos_stub: Option<Vec<u8>>,
 }
 
 impl DosHeader {
@@ -461,10 +456,7 @@ impl DosHeader {
             });
         }
 
-        Ok(Self {
-            dos_header,
-            _dos_stub: None,
-        })
+        Ok(Self { dos_header })
     }
 
     /// The file offset of the NT headers (`e_lfanew`).
@@ -499,11 +491,10 @@ impl DosHeader {
 // Section
 // ---------------------------------------------------------------------------
 
-/// A parsed section header plus, optionally, the section's bytes.
+/// A parsed section header.
 #[derive(Debug)]
 pub struct Section {
     section_header: IMAGE_SECTION_HEADER,
-    _section_data: Option<Vec<u8>>,
 }
 
 impl Section {
@@ -525,13 +516,7 @@ impl Section {
             .map_err(ParseError::DataSource)?;
         debug_assert_eq!(sz, size);
 
-        Ok((
-            Self {
-                section_header,
-                _section_data: None,
-            },
-            sz,
-        ))
+        Ok((Self { section_header }, sz))
     }
 
     /// 8-byte ASCII name, NUL-trimmed.

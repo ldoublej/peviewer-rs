@@ -118,7 +118,7 @@ pub trait DataSource: Debug + Send + Sync {
 
     /// Returns `true` if the source is known to be empty.
     fn is_empty(&self) -> bool {
-        self.len().map_or(false, |l| l == 0)
+        self.len() == Some(0)
     }
 
     /// Read exactly `buf.len()` bytes starting at `offset`.
@@ -177,9 +177,9 @@ pub trait DataSourceExt: DataSource {
     /// The caller must ensure that `T` is safe to initialize from arbitrary
     /// bytes (all bit-patterns valid). This is true for `#[repr(C)]` structs
     /// whose fields are all `u8`/`u16`/`u32`/`u64`/`[uN; M]`.
-    fn read_struct<T>(&self, offset: u64, strcut: &mut T) -> Result<usize, DataSourceError> {
+    fn read_struct<T>(&self, offset: u64, target: &mut T) -> Result<usize, DataSourceError> {
         let size = std::mem::size_of::<T>();
-        let slice = unsafe { std::slice::from_raw_parts_mut(strcut as *mut T as *mut u8, size) };
+        let slice = unsafe { std::slice::from_raw_parts_mut(target as *mut T as *mut u8, size) };
         self.read_exact(offset, slice)
     }
 
@@ -236,3 +236,119 @@ pub trait DataSourceExt: DataSource {
 
 // Blanket implementation: every DataSource also gets DataSourceExt.
 impl<T: DataSource + ?Sized> DataSourceExt for T {}
+
+// ---------------------------------------------------------------------------
+// Built-in implementations
+// ---------------------------------------------------------------------------
+
+/// Shared read logic for contiguous byte buffers.
+fn slice_read_exact(data: &[u8], offset: u64, buf: &mut [u8]) -> Result<(), DataSourceError> {
+    let start = offset as usize;
+    let end = start.checked_add(buf.len()).ok_or(DataSourceError::OutOfBounds {
+        offset,
+        length: buf.len(),
+        source_len: Some(data.len() as u64),
+    })?;
+
+    if end > data.len() {
+        return Err(DataSourceError::OutOfBounds {
+            offset,
+            length: buf.len(),
+            source_len: Some(data.len() as u64),
+        });
+    }
+
+    buf.copy_from_slice(&data[start..end]);
+    Ok(())
+}
+
+impl DataSource for Vec<u8> {
+    fn len(&self) -> Option<u64> {
+        Some(self.as_slice().len() as u64)
+    }
+
+    fn read_exact(&self, offset: u64, buf: &mut [u8]) -> Result<usize, DataSourceError> {
+        slice_read_exact(self.as_slice(), offset, buf)?;
+        Ok(buf.len())
+    }
+}
+
+impl DataSource for [u8] {
+    fn len(&self) -> Option<u64> {
+        Some(self.len() as u64)
+    }
+
+    fn read_exact(&self, offset: u64, buf: &mut [u8]) -> Result<usize, DataSourceError> {
+        slice_read_exact(self, offset, buf)?;
+        Ok(buf.len())
+    }
+}
+
+impl DataSource for &[u8] {
+    fn len(&self) -> Option<u64> {
+        Some((*self).len() as u64)
+    }
+
+    fn read_exact(&self, offset: u64, buf: &mut [u8]) -> Result<usize, DataSourceError> {
+        slice_read_exact(self, offset, buf)?;
+        Ok(buf.len())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn read_u32_from_slice() {
+        let data = 0xDEAD_BEEFu32.to_le_bytes();
+        let src: &[u8] = &data;
+        assert_eq!(src.read_u32(0).unwrap(), 0xDEAD_BEEF);
+    }
+
+    #[test]
+    fn out_of_bounds() {
+        let src: &[u8] = &[1, 2, 3];
+        let err = src.read_u32(0).unwrap_err();
+        assert!(matches!(err, DataSourceError::OutOfBounds { .. }));
+    }
+
+    #[test]
+    fn read_ascii_with_nul() {
+        let raw = b"PE\0\0";
+        let src: &[u8] = raw;
+        assert_eq!(src.read_ascii(0, 4).unwrap(), "PE");
+    }
+
+    #[test]
+    fn read_utf16_le() {
+        let raw: &[u8] = &[0x50, 0x00, 0x45, 0x00, 0x00, 0x00];
+        assert_eq!(raw.read_utf16(0, 3).unwrap(), "PE");
+    }
+
+    #[test]
+    fn vec_u8_impl() {
+        let data = vec![0x34, 0x12, 0x00, 0x00];
+        assert_eq!(data.read_u16(0).unwrap(), 0x1234);
+    }
+
+    #[test]
+    fn is_empty() {
+        let empty: &[u8] = &[];
+        let nonempty: &[u8] = &[1];
+        assert!(empty.is_empty());
+        assert!(!nonempty.is_empty());
+    }
+
+    #[test]
+    fn file_not_found_error() {
+        let err = DataSourceError::FileNotFound {
+            path: PathBuf::from("foo.exe"),
+        };
+        assert_eq!(err.to_string(), "file not found: foo.exe");
+    }
+}

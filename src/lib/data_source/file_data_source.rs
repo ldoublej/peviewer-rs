@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 // Platform-specific positioned read (like pread on Unix).
 #[cfg(unix)]
 use std::os::unix::fs::FileExt;
-// #[cfg(windows)]
+#[cfg(windows)]
 use std::os::windows::fs::FileExt;
 
 /// A [`DataSource`] backed by a real file on disk.
@@ -14,7 +14,7 @@ use std::os::windows::fs::FileExt;
 /// the kernel-side file offset — safe to share across threads.
 #[derive(Debug)]
 pub struct FileDataSource {
-    file_path_buf: PathBuf,
+    path: PathBuf,
     file: File,
 }
 
@@ -31,14 +31,14 @@ impl FileDataSource {
 
         let file = std::fs::File::open(path)?;
         Ok(Box::new(Self {
-            file_path_buf: path.to_path_buf(),
+            path: path.to_path_buf(),
             file,
         }))
     }
 
     /// The path this data source was opened from.
     pub fn file_path(&self) -> &Path {
-        &self.file_path_buf
+        &self.path
     }
 }
 
