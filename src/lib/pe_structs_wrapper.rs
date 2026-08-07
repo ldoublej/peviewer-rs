@@ -1,8 +1,8 @@
 use crate::data_source::DataSourceExt;
 use crate::pe::ParseError;
 use crate::pe_structs::{
-    IMAGE_DOS_HEADER, IMAGE_DOS_SIGNATURE, IMAGE_FILE_HEADER, IMAGE_NT_HEADERS,
-    IMAGE_NT_HEADERS_SIGNATURE, IMAGE_NT_HEADERS32, IMAGE_NT_HEADERS64,
+    IMAGE_DATA_DIRECTORY, IMAGE_DOS_HEADER, IMAGE_DOS_SIGNATURE, IMAGE_FILE_HEADER,
+    IMAGE_NT_HEADERS, IMAGE_NT_HEADERS_SIGNATURE, IMAGE_NT_HEADERS32, IMAGE_NT_HEADERS64,
     IMAGE_NT_OPTIONAL_HDR32_MAGIC, IMAGE_NT_OPTIONAL_HDR64_MAGIC, IMAGE_OPTIONAL_HEADER32,
     IMAGE_OPTIONAL_HEADER64, IMAGE_SECTION_HEADER,
 };
@@ -103,6 +103,13 @@ impl OptionalHeader {
     pub(crate) fn pe32_plus(h: IMAGE_OPTIONAL_HEADER64) -> Self {
         Self {
             inner: OptionalHeaderInner::Pe32Plus(h),
+        }
+    }
+
+    pub(crate) fn data_directory(&self, index: u16) -> IMAGE_DATA_DIRECTORY {
+        match &self.inner {
+            OptionalHeaderInner::Pe32(h) => h.DataDirectory[index as usize],
+            OptionalHeaderInner::Pe32Plus(h) => h.DataDirectory[index as usize],
         }
     }
 

@@ -6,7 +6,7 @@ use std::path::Path;
 pub struct PeFile {
     data_source: Box<dyn DataSource>,
     dos_header: DosHeader,
-    nt_header: NtHeaders,
+    nt_headers: NtHeaders,
     sections: Vec<Section>,
 }
 
@@ -36,7 +36,7 @@ impl PeFile {
         Ok(Self {
             dos_header,
             data_source,
-            nt_header: nt_headers,
+            nt_headers,
             sections,
         })
     }
@@ -55,7 +55,7 @@ impl PeFile {
     }
 
     pub fn nt_headers(&self) -> &NtHeaders {
-        &self.nt_header
+        &self.nt_headers
     }
 
     pub fn sections(&self) -> &Vec<Section> {
@@ -79,7 +79,7 @@ impl PeFile {
     pub fn file_header_report(&self) -> crate::report::Report {
         crate::report::Report::from_fields(
             "File Header",
-            crate::report::file_header_fields(self.nt_header.file_header()),
+            crate::report::file_header_fields(self.nt_headers.file_header()),
         )
     }
 
@@ -87,7 +87,7 @@ impl PeFile {
     pub fn optional_header_report(&self) -> crate::report::Report {
         crate::report::Report::from_fields(
             "Optional Header",
-            crate::report::optional_header_fields(self.nt_header.optional_header()),
+            crate::report::optional_header_fields(self.nt_headers.optional_header()),
         )
     }
 
@@ -110,12 +110,12 @@ impl PeFile {
     /// that want a runtime virtual address add this to the image base
     /// (which depends on bit width).
     pub fn address_of_entry_point(&self) -> u32 {
-        self.nt_header.optional_header().address_of_entry_point()
+        self.nt_headers.optional_header().address_of_entry_point()
     }
 
     /// True if the image is PE32+ (64-bit).
     pub fn is_pe32_plus(&self) -> bool {
-        self.nt_header.optional_header().is_pe32_plus()
+        self.nt_headers.optional_header().is_pe32_plus()
     }
 }
 
