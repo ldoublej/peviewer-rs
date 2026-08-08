@@ -1,3 +1,4 @@
+use crate::data_source::DataSource;
 use crate::data_source::DataSourceExt;
 use crate::pe::ParseError;
 use crate::pe_structs::{IMAGE_DOS_HEADER, IMAGE_DOS_SIGNATURE};
@@ -12,7 +13,7 @@ pub struct DosHeader {
 
 impl DosHeader {
     /// Parse a DOS header from the start of `source`.
-    pub fn parse<T: DataSourceExt + ?Sized>(source: &T) -> Result<Self, ParseError> {
+    pub fn parse<T: DataSource + ?Sized>(source: &T) -> Result<Self, ParseError> {
         let len = source.len().unwrap_or(0);
         if len < std::mem::size_of::<IMAGE_DOS_HEADER>() as u64 {
             return Err(ParseError::TooSmall(len));

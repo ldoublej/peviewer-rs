@@ -1,4 +1,5 @@
 use super::align::align_up;
+use crate::data_source::DataSource;
 use crate::data_source::DataSourceExt;
 use crate::pe::ParseError;
 use crate::pe_structs::IMAGE_SECTION_HEADER;
@@ -21,7 +22,7 @@ impl Section {
     /// source picks which size is read: the file-aligned `SizeOfRawData`
     /// (rounded up to `file_alignment`) or the in-memory `VirtualSize`
     /// (rounded up to `section_alignment`).
-    pub fn parse<T: DataSourceExt + ?Sized>(
+    pub fn parse<T: DataSource + ?Sized>(
         source: &T,
         offset: u64,
         section_alignment: u32,

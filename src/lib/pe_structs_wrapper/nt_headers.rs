@@ -1,5 +1,6 @@
 use super::file_header::FileHeader;
 use super::optional_header::OptionalHeader;
+use crate::data_source::DataSource;
 use crate::data_source::DataSourceExt;
 use crate::pe::ParseError;
 use crate::pe_structs::{
@@ -26,7 +27,7 @@ impl NtHeaders {
     /// Parse the NT-headers block starting at `offset`. Validates the
     /// `PE\0\0` signature and the optional-header magic, then dispatches
     /// to PE32 or PE32+.
-    pub fn parse<T: DataSourceExt + ?Sized>(source: &T, offset: u64) -> Result<Self, ParseError> {
+    pub fn parse<T: DataSource + ?Sized>(source: &T, offset: u64) -> Result<Self, ParseError> {
         let min_size = std::mem::size_of::<u32>() + std::mem::size_of::<IMAGE_FILE_HEADER>();
         if source.len().unwrap_or(0) < offset + min_size as u64 {
             return Err(ParseError::TooSmall(source.len().unwrap_or(0)));
