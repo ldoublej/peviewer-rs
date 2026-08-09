@@ -11,6 +11,7 @@ mod image_base;
 mod nt_headers;
 mod optional_header;
 mod section;
+mod import;
 
 pub use dos_header::DosHeader;
 pub use file_header::FileHeader;

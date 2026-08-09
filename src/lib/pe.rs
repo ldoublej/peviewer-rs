@@ -1,5 +1,6 @@
 use crate::data_source::{DataSource, FileDataSource};
 use crate::pe_structs_wrapper::{DosHeader, NtHeaders, Section};
+use crate::pe_structs::{*};
 use std::path::Path;
 
 #[derive(Debug)]
@@ -9,6 +10,22 @@ pub struct PeFile {
     nt_headers: NtHeaders,
     sections: Vec<Section>,
 }
+
+
+#[allow(non_snake_case)]
+fn RVA2FOA(sections: &Vec<Section>, rva: u32) -> u32 {
+    let option_section =  sections.iter().find(|s| {
+        rva >= s.virtual_address() && rva < s.virtual_address() + s.virtual_size()
+    });
+    if let Some(section) = option_section {
+        let section_offset = rva - section.virtual_address();
+        section.raw_offset() + section_offset
+    }
+    else {
+        0
+    }
+}
+
 
 impl PeFile {
     pub fn open_from_datasource(data_source: Box<dyn DataSource>) -> Result<Self, ParseError> {
@@ -32,6 +49,17 @@ impl PeFile {
             section_offset += bytes_read as u64;
             sections.push(section);
         }
+
+        // 根据对齐方式计算导入表偏移
+        let input_table = if data_source.is_file_aligned() {
+            let virtual_size = nt_headers.optional_header().data_directory(IMAGE_DIRECTORY_ENTRY_IMPORT).VirtualAddress;
+            RVA2FOA(&sections, virtual_size)
+        } else {
+            nt_headers.optional_header().data_directory(IMAGE_DIRECTORY_ENTRY_IMPORT).VirtualAddress
+        };
+
+        debug_assert!(input_table > 0);
+        
 
         Ok(Self {
             dos_header,
@@ -116,6 +144,10 @@ impl PeFile {
     /// True if the image is PE32+ (64-bit).
     pub fn is_pe32_plus(&self) -> bool {
         self.nt_headers.optional_header().is_pe32_plus()
+    }
+
+    pub fn rva2foa(&self, rva: u32) -> u32 {
+        RVA2FOA(&self.sections, rva)
     }
 }
 

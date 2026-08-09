@@ -32,7 +32,7 @@ impl OptionalHeader {
         }
     }
 
-    pub(crate) fn data_directory(&self, index: u16) -> IMAGE_DATA_DIRECTORY {
+    pub(crate) fn data_directory(&self, index: usize) -> IMAGE_DATA_DIRECTORY {
         match &self.inner {
             OptionalHeaderInner::Pe32(h) => h.DataDirectory[index as usize],
             OptionalHeaderInner::Pe32Plus(h) => h.DataDirectory[index as usize],
