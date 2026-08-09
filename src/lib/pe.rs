@@ -20,7 +20,16 @@ impl PeFile {
 
         let section_offset = nt_start + nt_headers.total_size();
         let count = nt_headers.file_header().number_of_sections() as usize;
-        let sections = Sections::parse(&*data_source, section_offset, count)?;
+
+        let section_alignment = if data_source.is_file_aligned() {
+            nt_headers.optional_header().file_alignment()
+        }
+        else {
+            nt_headers.optional_header().section_alignment()
+        } as usize;
+
+
+        let sections = Sections::parse(&*data_source, section_offset, count, section_alignment)?;
 
         // 根据对齐方式计算导入表偏移
         let mut input_table_offset = if data_source.is_file_aligned() {
@@ -89,6 +98,10 @@ impl PeFile {
 
     pub fn sections(&self) -> &Sections {
         &self.sections
+    }
+
+    pub fn imports(&self) -> &Vec<Import> {
+        &self.imports
     }
 
     // -- Reports ------------------------------------------------------------

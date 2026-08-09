@@ -14,11 +14,12 @@ impl Sections {
         data_source: &T,
         offset: u64,
         count: usize,
+        alignment: usize
     ) -> Result<Self, ParseError> {
         let mut section_offset = offset;
         let mut sections = Vec::with_capacity(count);
         for _ in 0..count {
-            let (section, bytes_read) = Section::parse(data_source, section_offset)?;
+            let (section, bytes_read) = Section::parse(data_source, section_offset, alignment)?;
             section_offset += bytes_read as u64;
             sections.push(section);
         }
@@ -68,15 +69,29 @@ impl Section {
     /// plus the number of bytes consumed (always
     /// `size_of::<IMAGE_SECTION_HEADER>()`).
     ///
-    /// `section_alignment` and `file_alignment` come from the optional
-    /// header; they are used to round the section's on-image / in-file
-    /// size up to a multiple of the alignment. `is_file_aligned` on the
-    /// source picks which size is read: the file-aligned `SizeOfRawData`
-    /// (rounded up to `file_alignment`) or the in-memory `VirtualSize`
-    /// (rounded up to `section_alignment`).
+    /// `alignment` comes from the optional header and is used to round
+    /// the section's on-image / in-file size up to a multiple of the
+    /// alignment. `is_file_aligned` on the source picks which size is
+    /// read: the file-aligned `SizeOfRawData` (rounded up to
+    /// `file_alignment`) or the in-memory `VirtualSize` (rounded up
+    /// to `section_alignment`).
+    ///
+    /// # In-memory read path
+    ///
+    /// The non-file-aligned branch is a scaffold for a future mmap
+    /// view; it treats `VirtualAddress` as a direct byte offset, which
+    /// is wrong for a real image (an RVA only becomes a real virtual
+    /// address once `ImageBase` is added). Today every `DataSource`
+    /// impl that returns `is_file_aligned() == false`
+    /// (`Vec<u8>`, `&[u8]`) still holds a file-layout buffer, so the
+    /// file-aligned branch is the only one that's actually exercised.
+    /// Callers that want correct in-memory reads should add a real
+    /// mapped-image `DataSource` and a proper RVA→VA translation
+    /// here.
     pub fn parse<T: DataSource + ?Sized>(
         data_source: &T,
         offset: u64,
+        alignment: usize
     ) -> Result<(Self, usize), ParseError> {
         let size = std::mem::size_of::<IMAGE_SECTION_HEADER>();
         if data_source.len().unwrap_or(0) < offset + size as u64 {
@@ -89,13 +104,17 @@ impl Section {
             .map_err(ParseError::DataSource)?;
         debug_assert_eq!(sz, size);
 
-        let section_offset = section_header.PointerToRawData as u64;
+        let section_offset = if data_source.is_file_aligned() {
+            section_header.PointerToRawData as u64
+        } else {
+            section_header.VirtualAddress as u64
+        };
         let raw_size = section_header.SizeOfRawData as usize;
         let virtual_size = section_header.VirtualSize as usize;
         let section_size = if data_source.is_file_aligned() {
-            raw_size
+            align_up(raw_size,alignment)
         } else {
-            virtual_size
+            align_up(virtual_size,alignment)
         };
 
         let raw_section_data = data_source.read_bytes(section_offset, section_size)?;
