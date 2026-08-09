@@ -32,51 +32,55 @@ impl PeFile {
 
         // 根据对齐方式计算导入表偏移
         let mut input_table_offset = if data_source.is_file_aligned() {
-            let virtual_size = nt_headers
+            let virtual_address = nt_headers
                 .optional_header()
                 .data_directory(IMAGE_DIRECTORY_ENTRY_IMPORT)
                 .VirtualAddress;
-            sections.RVA2FOA(virtual_size)
+            sections.RVA2FOA(virtual_address)
         } else {
             nt_headers
                 .optional_header()
                 .data_directory(IMAGE_DIRECTORY_ENTRY_IMPORT)
                 .VirtualAddress
         };
-        debug_assert!(input_table_offset > 0);
 
+        // 无导入表时 IMAGE_DIRECTORY_ENTRY_IMPORT.VirtualAddress == 0，
+        // 不应继续向下解析（否则会把 DOS 头当 IMAGE_IMPORT_DESCRIPTOR）。
+        // 用真正的运行时检查代替 debug_assert!，保证 release 也安全。
         let mut imports: Vec<Import> = vec![];
-        loop {
-            let mut uninit_import_desc = MaybeUninit::<IMAGE_IMPORT_DESCRIPTOR>::uninit();
-            unsafe {
-                let sz = data_source.read_struct(
-                    input_table_offset as u64,
-                    &mut (*uninit_import_desc.as_mut_ptr()),
-                )?;
-                let import_desc = uninit_import_desc.assume_init();
-                input_table_offset += sz as u32;
+        if input_table_offset > 0 {
+            loop {
+                let mut uninit_import_desc = MaybeUninit::<IMAGE_IMPORT_DESCRIPTOR>::uninit();
+                unsafe {
+                    let sz = data_source.read_struct(
+                        input_table_offset as u64,
+                        &mut (*uninit_import_desc.as_mut_ptr()),
+                    )?;
+                    let import_desc = uninit_import_desc.assume_init();
+                    input_table_offset += sz as u32;
 
-                if import_desc.is_null() {
-                    break;
+                    if import_desc.is_null() {
+                        break;
+                    }
+
+                    let import = Import::parse(
+                        &*data_source,
+                        &|rva| sections.RVA2FOA(rva),
+                        import_desc,
+                        nt_headers.optional_header().is_pe32_plus(),
+                    )?;
+                    imports.push(import);
                 }
-
-                let import = Import::parse(
-                    &*data_source,
-                    &|rva| sections.RVA2FOA(rva),
-                    import_desc,
-                    nt_headers.optional_header().is_pe32_plus(),
-                )?;
-                imports.push(import);
             }
         }
 
         // 根据对齐方式计算导入表偏移
         let export_table_offset = if data_source.is_file_aligned() {
-            let virtual_size = nt_headers
+            let virtual_address = nt_headers
                 .optional_header()
                 .data_directory(IMAGE_DIRECTORY_ENTRY_EXPORT)
                 .VirtualAddress;
-            sections.RVA2FOA(virtual_size)
+            sections.RVA2FOA(virtual_address)
         } else {
             nt_headers
                 .optional_header()

@@ -40,8 +40,15 @@ impl Export {
         }
 
         let num_of_functions = export_desc.NumberOfFunctions;
-        let function_offset = rva_to_foa(export_desc.AddressOfFunctions);
-        let mut function_addr_table: Vec<u64> = Vec::with_capacity(num_of_name as usize);
+        // 函数表本身的偏移也按 file_aligned 选择 RVA/FOA——之前无条件 rva_to_foa
+        // 在 non-file-aligned 路径下会读错位置
+        let function_offset = if data_source.is_file_aligned() {
+            rva_to_foa(export_desc.AddressOfFunctions)
+        } else {
+            export_desc.AddressOfFunctions
+        };
+        // 用真实循环上界预分配容量
+        let mut function_addr_table: Vec<u64> = Vec::with_capacity(num_of_functions as usize);
         for i in 0..num_of_functions {
             let function_virtual_address = data_source
                 .read_u32((function_offset + i * std::mem::size_of::<u32>() as u32) as u64)?;
@@ -53,6 +60,14 @@ impl Export {
             }
         }
 
+        // TODO(forwarder): 当某个函数 RVA 落在导出目录自身范围内
+        // ([export_dir_rva, export_dir_rva + export_dir_size)) 时，它是
+        // "dll_name.function_name" 形式的 forwarder 字符串，Windows loader
+        // 会据此把调用重定向到别的 DLL。当前实现会把 forwarder 错当成普通
+        // 函数地址返回。后续支持 forwarder 时需要：
+        //   1. Export::parse 接收 export_dir_rva / export_dir_size
+        //   2. 增加 is_forwarder_by_* / forwarder_by_* 查询方法
+        //   3. function_address_by_* 在 forwarder 情形返回 None
         Ok(Self {
             name_table,
             function_addr_table,
@@ -74,6 +89,10 @@ impl Export {
     }
 
     pub fn function_address_by_ordinal(&self, function_ordinal: u16) -> Option<u64> {
+        // 防止 u16 减法下溢 (debug 模式 panic / release 环绕)
+        if function_ordinal < self.ordinal_base {
+            return None;
+        }
         let index = (function_ordinal - self.ordinal_base) as usize;
         if index < self.function_addr_table.len() {
             self.function_addr_table.get(index).cloned()

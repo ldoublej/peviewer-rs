@@ -28,13 +28,21 @@ impl Sections {
 
     #[allow(non_snake_case)]
     pub fn RVA2FOA(&self, rva: u32) -> u32 {
-        let option_section = self
-            .sections
-            .iter()
-            .find(|s| rva >= s.virtual_address() && rva < s.virtual_address() + s.virtual_size());
+        let rva = rva as u64;
+        let option_section = self.sections.iter().find(|s| {
+            // BSS 段 (SizeOfRawData == 0) 在文件中没有内容，不应被命中——
+            // 否则会返回一个看起来合法但其实指向空数据的 FOA。
+            if s.raw_size() == 0 {
+                return false;
+            }
+            // 用 u64 计算结束地址，避免 VirtualAddress + VirtualSize 在 u32 上溢出
+            let va = s.virtual_address() as u64;
+            let vs = s.virtual_size() as u64;
+            rva >= va && rva < va.saturating_add(vs)
+        });
         if let Some(section) = option_section {
-            let section_offset = rva - section.virtual_address();
-            section.raw_offset() + section_offset
+            let section_offset = (rva - section.virtual_address() as u64) as u32;
+            section.raw_offset().saturating_add(section_offset)
         } else {
             0
         }
@@ -94,8 +102,12 @@ impl Section {
         alignment: usize,
     ) -> Result<(Self, usize), ParseError> {
         let size = std::mem::size_of::<IMAGE_SECTION_HEADER>();
-        if data_source.len().unwrap_or(0) < offset + size as u64 {
-            return Err(ParseError::TooSmall(data_source.len().unwrap_or(0)));
+        // 流式 DataSource 的 len() 可能返回 None；不要因为取不到总长就拒绝解析，
+        // 让真正的 read_exact 在越界时报错即可。
+        if let Some(len) = data_source.len()
+            && len < offset + size as u64
+        {
+            return Err(ParseError::TooSmall(len));
         }
 
         let mut section_header = unsafe { std::mem::zeroed::<IMAGE_SECTION_HEADER>() };
