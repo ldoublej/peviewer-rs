@@ -1,7 +1,6 @@
 use clap::{Parser, ValueEnum};
 use comfy_table::presets::UTF8_FULL;
 use comfy_table::{ContentArrangement, Table};
-use iced_x86::{Decoder, DecoderOptions, Formatter, NasmFormatter};
 use pe::PeFile;
 use pe::report::Report;
 use std::path::PathBuf;
@@ -49,7 +48,7 @@ struct Cli {
     #[arg(long)]
     data_directories: bool,
 
-    /// Print the export directory. (not yet implemented)
+    /// Print the export directory. (coming soon)
     #[arg(long)]
     exports: bool,
 
@@ -84,14 +83,6 @@ struct Cli {
     /// Print the load config directory. (not yet implemented)
     #[arg(long)]
     load_config: bool,
-
-    /// Disassemble the `.text` section.
-    #[arg(long)]
-    disasm: bool,
-
-    /// Maximum number of instructions to disassemble.
-    #[arg(long, default_value_t = 64, value_name = "N")]
-    disasm_limit: usize,
 
     /// Print all available content. Unimplemented directories are skipped.
     #[arg(long)]
@@ -155,8 +146,8 @@ fn main() {
         || cli.relocations
         || cli.debug
         || cli.tls
-        || cli.load_config
-        || cli.disasm;
+        || cli.load_config;
+
     let want = |flag: bool| cli.all || flag || !any_selected;
 
     // Implemented content.
@@ -173,17 +164,15 @@ fn main() {
         print_report(pe_file.sections_report());
     }
 
-    if want(cli.disasm) {
-        if let Err(e) = print_text_disasm(&pe_file, cli.disasm_limit) {
-            eprintln!("error: disassembly failed: {e}");
-        }
+
+    if cli.exports {
+        eprintln!("note: --exports is coming soon; not yet implemented");
     }
 
     // Directories that are not wired up yet. They are only reported when
     // requested explicitly; `--all` skips them to stay quiet.
     for (requested, name) in [
         (cli.data_directories, "data-directories"),
-        (cli.exports, "exports"),
         (cli.imports, "imports"),
         (cli.resources, "resources"),
         (cli.exceptions, "exceptions"),
@@ -233,37 +222,3 @@ fn print_report(report: Report) {
     println!("{table}");
 }
 
-// ---------------------------------------------------------------------------
-// Disassembly (CLI-only)
-// ---------------------------------------------------------------------------
-
-/// Print the `.text` section disassembly as plain text, one instruction
-/// per line. Does nothing if the image has no `.text` section.
-fn print_text_disasm(pe_file: &PeFile, limit: usize) -> Result<(), String> {
-    let Some(section) = pe_file.sections().section_by_name(".text") else {
-        eprintln!("note: no .text section in this image");
-        return Ok(());
-    };
-
-    let bitness: u32 = if pe_file.is_pe32_plus() { 64 } else { 32 };
-    let bytes = section
-        .section_data()
-        .ok_or_else(|| "section has no raw data".to_string())?;
-    let vaddr = section.virtual_address() as u64;
-
-    let mut decoder = Decoder::with_ip(bitness, bytes, vaddr, DecoderOptions::NONE);
-    let mut formatter = NasmFormatter::new();
-    let mut output = String::new();
-    let mut count = 0usize;
-
-    while count < limit && decoder.can_decode() {
-        let ip = decoder.ip();
-        let instr = decoder.decode();
-        output.clear();
-        formatter.format(&instr, &mut output);
-        println!("{ip:016X}  {output}");
-        count += 1;
-    }
-
-    Ok(())
-}
