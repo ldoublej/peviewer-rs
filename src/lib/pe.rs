@@ -1,31 +1,16 @@
-use crate::data_source::{DataSource, FileDataSource};
-use crate::pe_structs_wrapper::{DosHeader, NtHeaders, Section};
-use crate::pe_structs::{*};
+use crate::data_source::{DataSource, DataSourceExt, FileDataSource};
+use crate::pe_structs::*;
+use crate::pe_structs_wrapper::{DosHeader, Import, NtHeaders, Sections};
+use std::mem::MaybeUninit;
 use std::path::Path;
-
 #[derive(Debug)]
 pub struct PeFile {
     data_source: Box<dyn DataSource>,
     dos_header: DosHeader,
     nt_headers: NtHeaders,
-    sections: Vec<Section>,
+    sections: Sections,
+    imports: Vec<Import>,
 }
-
-
-#[allow(non_snake_case)]
-fn RVA2FOA(sections: &Vec<Section>, rva: u32) -> u32 {
-    let option_section =  sections.iter().find(|s| {
-        rva >= s.virtual_address() && rva < s.virtual_address() + s.virtual_size()
-    });
-    if let Some(section) = option_section {
-        let section_offset = rva - section.virtual_address();
-        section.raw_offset() + section_offset
-    }
-    else {
-        0
-    }
-}
-
 
 impl PeFile {
     pub fn open_from_datasource(data_source: Box<dyn DataSource>) -> Result<Self, ParseError> {
@@ -33,39 +18,51 @@ impl PeFile {
         let nt_start = dos_header.e_lfanew() as u64;
         let nt_headers = NtHeaders::parse(&*data_source, nt_start)?;
 
-        let mut section_offset = nt_start + nt_headers.total_size();
+        let section_offset = nt_start + nt_headers.total_size();
         let count = nt_headers.file_header().number_of_sections() as usize;
-        let opt = nt_headers.optional_header();
-        let section_alignment = opt.section_alignment();
-        let file_alignment = opt.file_alignment();
-        let mut sections = Vec::with_capacity(count);
-        for _ in 0..count {
-            let (section, bytes_read) = Section::parse(
-                &*data_source,
-                section_offset,
-                section_alignment,
-                file_alignment,
-            )?;
-            section_offset += bytes_read as u64;
-            sections.push(section);
-        }
+        let sections = Sections::parse(&*data_source, section_offset, count)?;
 
         // 根据对齐方式计算导入表偏移
-        let input_table = if data_source.is_file_aligned() {
-            let virtual_size = nt_headers.optional_header().data_directory(IMAGE_DIRECTORY_ENTRY_IMPORT).VirtualAddress;
-            RVA2FOA(&sections, virtual_size)
+        let mut input_table_offset = if data_source.is_file_aligned() {
+            let virtual_size = nt_headers
+                .optional_header()
+                .data_directory(IMAGE_DIRECTORY_ENTRY_IMPORT)
+                .VirtualAddress;
+            sections.RVA2FOA(virtual_size)
         } else {
-            nt_headers.optional_header().data_directory(IMAGE_DIRECTORY_ENTRY_IMPORT).VirtualAddress
+            nt_headers
+                .optional_header()
+                .data_directory(IMAGE_DIRECTORY_ENTRY_IMPORT)
+                .VirtualAddress
         };
+        debug_assert!(input_table_offset > 0);
 
-        debug_assert!(input_table > 0);
-        
+        let mut imports: Vec<Import> = vec![];
+        loop {
+            let mut uninit_import_desc = MaybeUninit::<IMAGE_IMPORT_DESCRIPTOR>::uninit();
+            unsafe {
+                let sz = data_source.read_struct(
+                    input_table_offset as u64,
+                    &mut (*uninit_import_desc.as_mut_ptr()),
+                )?;
+                let import_desc = uninit_import_desc.assume_init();
+                input_table_offset += sz as u32;
+
+                if import_desc.is_null() {
+                    break;
+                }
+
+                let import = Import::parse(&*data_source, import_desc);
+                imports.push(import);
+            }
+        }
 
         Ok(Self {
             dos_header,
             data_source,
             nt_headers,
             sections,
+            imports,
         })
     }
 
@@ -86,7 +83,7 @@ impl PeFile {
         &self.nt_headers
     }
 
-    pub fn sections(&self) -> &Vec<Section> {
+    pub fn sections(&self) -> &Sections {
         &self.sections
     }
 
@@ -122,16 +119,12 @@ impl PeFile {
     /// Report for the section table.
     pub fn sections_report(&self) -> crate::report::Report {
         let rows = self
-            .sections
+            .sections()
+            .sections()
             .iter()
             .map(crate::report::section_row)
             .collect();
         crate::report::Report::new("Sections", crate::report::SECTION_COLUMNS, rows)
-    }
-
-    /// Returns the section named exactly `.text`, if present.
-    pub fn text_section(&self) -> Option<&Section> {
-        self.sections.iter().find(|s| s.name() == ".text")
     }
 
     /// The `ImageBase` + `AddressOfEntryPoint` (the entry RVA). Callers
@@ -147,7 +140,7 @@ impl PeFile {
     }
 
     pub fn rva2foa(&self, rva: u32) -> u32 {
-        RVA2FOA(&self.sections, rva)
+        self.sections.RVA2FOA(rva)
     }
 }
 

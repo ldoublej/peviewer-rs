@@ -1,7 +1,5 @@
 use super::image_base::ImageBase;
-use crate::pe_structs::{
-    IMAGE_DATA_DIRECTORY, IMAGE_OPTIONAL_HEADER32, IMAGE_OPTIONAL_HEADER64,
-};
+use crate::pe_structs::{IMAGE_DATA_DIRECTORY, IMAGE_OPTIONAL_HEADER32, IMAGE_OPTIONAL_HEADER64};
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum OptionalHeaderInner {

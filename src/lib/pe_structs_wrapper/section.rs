@@ -4,6 +4,58 @@ use crate::data_source::DataSourceExt;
 use crate::pe::ParseError;
 use crate::pe_structs::IMAGE_SECTION_HEADER;
 
+#[derive(Debug)]
+pub struct Sections {
+    sections: Vec<Section>,
+}
+
+impl Sections {
+    pub fn parse<T: DataSource + ?Sized>(
+        data_source: &T,
+        offset: u64,
+        count: usize,
+    ) -> Result<Self, ParseError> {
+        let mut section_offset = offset;
+        let mut sections = Vec::with_capacity(count);
+        for _ in 0..count {
+            let (section, bytes_read) = Section::parse(data_source, section_offset)?;
+            section_offset += bytes_read as u64;
+            sections.push(section);
+        }
+        Ok(Self { sections })
+    }
+
+    #[allow(non_snake_case)]
+    pub fn RVA2FOA(&self, rva: u32) -> u32 {
+        let option_section = self
+            .sections
+            .iter()
+            .find(|s| rva >= s.virtual_address() && rva < s.virtual_address() + s.virtual_size());
+        if let Some(section) = option_section {
+            let section_offset = rva - section.virtual_address();
+            section.raw_offset() + section_offset
+        } else {
+            0
+        }
+    }
+
+    pub fn sections(&self) -> &Vec<Section> {
+        &self.sections
+    }
+
+    pub fn section_by_name(&self, name: &str) -> Option<&Section> {
+        self.sections.iter().find(|s| s.name() == name)
+    }
+
+    pub fn len(&self) -> usize {
+        self.sections.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.sections.is_empty()
+    }
+}
+
 /// A parsed section header.
 #[derive(Debug)]
 pub struct Section {
@@ -23,18 +75,16 @@ impl Section {
     /// (rounded up to `file_alignment`) or the in-memory `VirtualSize`
     /// (rounded up to `section_alignment`).
     pub fn parse<T: DataSource + ?Sized>(
-        source: &T,
+        data_source: &T,
         offset: u64,
-        section_alignment: u32,
-        file_alignment: u32,
     ) -> Result<(Self, usize), ParseError> {
         let size = std::mem::size_of::<IMAGE_SECTION_HEADER>();
-        if source.len().unwrap_or(0) < offset + size as u64 {
-            return Err(ParseError::TooSmall(source.len().unwrap_or(0)));
+        if data_source.len().unwrap_or(0) < offset + size as u64 {
+            return Err(ParseError::TooSmall(data_source.len().unwrap_or(0)));
         }
 
         let mut section_header = unsafe { std::mem::zeroed::<IMAGE_SECTION_HEADER>() };
-        let sz = source
+        let sz = data_source
             .read_struct(offset, &mut section_header)
             .map_err(ParseError::DataSource)?;
         debug_assert_eq!(sz, size);
@@ -42,13 +92,13 @@ impl Section {
         let section_offset = section_header.PointerToRawData as u64;
         let raw_size = section_header.SizeOfRawData as usize;
         let virtual_size = section_header.VirtualSize as usize;
-        let section_size = if source.is_file_aligned() {
-            align_up(raw_size, file_alignment as usize)
+        let section_size = if data_source.is_file_aligned() {
+            raw_size
         } else {
-            align_up(virtual_size, section_alignment as usize)
+            virtual_size
         };
 
-        let raw_section_data = source.read_bytes(section_offset, section_size)?;
+        let raw_section_data = data_source.read_bytes(section_offset, section_size)?;
         Ok((
             Self {
                 section_header,

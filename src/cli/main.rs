@@ -240,7 +240,7 @@ fn print_report(report: Report) {
 /// Print the `.text` section disassembly as plain text, one instruction
 /// per line. Does nothing if the image has no `.text` section.
 fn print_text_disasm(pe_file: &PeFile, limit: usize) -> Result<(), String> {
-    let Some(section) = pe_file.text_section() else {
+    let Some(section) = pe_file.sections().section_by_name(".text") else {
         eprintln!("note: no .text section in this image");
         return Ok(());
     };

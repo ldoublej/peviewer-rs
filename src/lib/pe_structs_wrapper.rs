@@ -8,14 +8,16 @@ mod align;
 mod dos_header;
 mod file_header;
 mod image_base;
+mod import;
 mod nt_headers;
 mod optional_header;
 mod section;
-mod import;
 
 pub use dos_header::DosHeader;
 pub use file_header::FileHeader;
 pub use image_base::ImageBase;
+pub use import::Import;
 pub use nt_headers::NtHeaders;
 pub use optional_header::OptionalHeader;
 pub use section::Section;
+pub use section::Sections;
