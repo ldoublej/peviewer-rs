@@ -52,7 +52,11 @@ impl PeFile {
                     break;
                 }
 
-                let import = Import::parse(&*data_source, import_desc);
+                let import = Import::parse(
+                    &*data_source,
+                    &|rva| sections.RVA2FOA(rva),
+                    import_desc,
+                )?;
                 imports.push(import);
             }
         }
