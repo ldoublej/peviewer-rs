@@ -65,6 +65,7 @@ impl PeFile {
                     &*data_source,
                     &|rva| sections.RVA2FOA(rva),
                     import_desc,
+                    nt_headers.optional_header().is_pe32_plus()
                 )?;
                 imports.push(import);
             }
