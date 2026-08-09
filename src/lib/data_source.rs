@@ -123,6 +123,8 @@ pub trait DataSource: Debug + Send + Sync {
 
     fn is_file_aligned(&self) -> bool;
 
+    fn image_base(&self) -> u64;
+
     /// Read exactly `buf.len()` bytes starting at `offset`.
     ///
     /// # Errors
@@ -238,75 +240,3 @@ pub trait DataSourceExt: DataSource {
 
 // Blanket implementation: every DataSource also gets DataSourceExt.
 impl<T: DataSource + ?Sized> DataSourceExt for T {}
-
-// ---------------------------------------------------------------------------
-// Built-in implementations
-// ---------------------------------------------------------------------------
-
-/// Shared read logic for contiguous byte buffers.
-fn slice_read_exact(data: &[u8], offset: u64, buf: &mut [u8]) -> Result<(), DataSourceError> {
-    let start = offset as usize;
-    let end = start
-        .checked_add(buf.len())
-        .ok_or(DataSourceError::OutOfBounds {
-            offset,
-            length: buf.len(),
-            source_len: Some(data.len() as u64),
-        })?;
-
-    if end > data.len() {
-        return Err(DataSourceError::OutOfBounds {
-            offset,
-            length: buf.len(),
-            source_len: Some(data.len() as u64),
-        });
-    }
-
-    buf.copy_from_slice(&data[start..end]);
-    Ok(())
-}
-
-impl DataSource for Vec<u8> {
-    fn len(&self) -> Option<u64> {
-        Some(self.as_slice().len() as u64)
-    }
-
-    fn is_file_aligned(&self) -> bool {
-        false
-    }
-
-    fn read_exact(&self, offset: u64, buf: &mut [u8]) -> Result<usize, DataSourceError> {
-        slice_read_exact(self.as_slice(), offset, buf)?;
-        Ok(buf.len())
-    }
-}
-
-impl DataSource for [u8] {
-    fn len(&self) -> Option<u64> {
-        Some(self.len() as u64)
-    }
-
-    fn is_file_aligned(&self) -> bool {
-        false
-    }
-
-    fn read_exact(&self, offset: u64, buf: &mut [u8]) -> Result<usize, DataSourceError> {
-        slice_read_exact(self, offset, buf)?;
-        Ok(buf.len())
-    }
-}
-
-impl DataSource for &[u8] {
-    fn len(&self) -> Option<u64> {
-        Some((*self).len() as u64)
-    }
-
-    fn is_file_aligned(&self) -> bool {
-        false
-    }
-
-    fn read_exact(&self, offset: u64, buf: &mut [u8]) -> Result<usize, DataSourceError> {
-        slice_read_exact(self, offset, buf)?;
-        Ok(buf.len())
-    }
-}

@@ -55,6 +55,10 @@ impl DataSource for FileDataSource {
         true
     }
 
+    fn image_base(&self) -> u64 {
+        0
+    }
+
     fn read_exact(&self, offset: u64, buf: &mut [u8]) -> Result<usize, DataSourceError> {
         let mut cursor = 0usize;
 

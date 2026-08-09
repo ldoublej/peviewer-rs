@@ -6,6 +6,7 @@
 
 mod align;
 mod dos_header;
+mod export;
 mod file_header;
 mod image_base;
 mod import;
@@ -14,6 +15,7 @@ mod optional_header;
 mod section;
 
 pub use dos_header::DosHeader;
+pub use export::Export;
 pub use file_header::FileHeader;
 pub use image_base::ImageBase;
 pub use import::Import;

@@ -6,7 +6,7 @@ use crate::pe_structs::IMAGE_IMPORT_DESCRIPTOR;
 pub enum ImportEntry {
     ImportByOrdinal(u32),
     ImportByName(u16, String),
-    FunctionAddress(u64)
+    FunctionAddress(u64),
 }
 
 #[derive(Debug)]
@@ -22,7 +22,7 @@ impl Import {
         data_source: &T,
         rva_to_foa: &dyn Fn(u32) -> u32,
         import_desc: IMAGE_IMPORT_DESCRIPTOR,
-        is_pe32p: bool
+        is_pe32p: bool,
     ) -> Result<Self, ParseError> {
         let dll_name_foa = rva_to_foa(import_desc.Name);
         let dll_name = data_source
@@ -31,7 +31,7 @@ impl Import {
         let mut int: Vec<ImportEntry> = vec![];
         let mut iat: Vec<ImportEntry> = vec![];
 
-        let mut original_thunk_offset =  rva_to_foa(import_desc.OriginalFirstThunk) as u64;
+        let mut original_thunk_offset = rva_to_foa(import_desc.OriginalFirstThunk) as u64;
 
         // 读取INT
         loop {
@@ -39,8 +39,7 @@ impl Import {
             let thunk_size = if is_pe32p {
                 thunk = data_source.read_u64(original_thunk_offset)? as u32;
                 std::mem::size_of::<u64>()
-            }
-            else {
+            } else {
                 thunk = data_source.read_u32(original_thunk_offset)?;
                 std::mem::size_of::<u32>()
             };
@@ -54,25 +53,24 @@ impl Import {
                 let ordinal = thunk & 0x7FFFFFFF;
                 int.push(ImportEntry::ImportByOrdinal(ordinal));
             } else {
-                let mut import_by_name_offset =  rva_to_foa(thunk) as u64;
+                let mut import_by_name_offset = rva_to_foa(thunk) as u64;
                 let hint = data_source.read_u16(import_by_name_offset)?;
                 import_by_name_offset += std::mem::size_of::<u16>() as u64;
-                let name = data_source.read_ascii(import_by_name_offset,256)?;
+                let name = data_source.read_ascii(import_by_name_offset, 256)?;
                 int.push(ImportEntry::ImportByName(hint, name));
             }
             original_thunk_offset += thunk_size as u64;
         }
 
         // 读取IAT
-        let mut first_thunk_offset =  rva_to_foa(import_desc.FirstThunk) as u64;
+        let mut first_thunk_offset = rva_to_foa(import_desc.FirstThunk) as u64;
         if !data_source.is_file_aligned() {
             loop {
                 let thunk: u64;
                 let thunk_size = if is_pe32p {
                     thunk = data_source.read_u64(first_thunk_offset)?;
                     std::mem::size_of::<u64>()
-                }
-                else {
+                } else {
                     thunk = data_source.read_u32(first_thunk_offset)? as u64;
                     std::mem::size_of::<u32>()
                 };
@@ -83,8 +81,7 @@ impl Import {
                 first_thunk_offset += thunk_size as u64;
                 int.push(ImportEntry::FunctionAddress(thunk));
             }
-        }
-        else {
+        } else {
             iat = int.clone();
         }
         Ok(Self {

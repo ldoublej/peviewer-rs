@@ -1,6 +1,6 @@
 use crate::data_source::{DataSource, DataSourceExt, FileDataSource};
 use crate::pe_structs::*;
-use crate::pe_structs_wrapper::{DosHeader, Import, NtHeaders, Sections};
+use crate::pe_structs_wrapper::{DosHeader, Export, Import, NtHeaders, Sections};
 use std::mem::MaybeUninit;
 use std::path::Path;
 #[derive(Debug)]
@@ -10,6 +10,7 @@ pub struct PeFile {
     nt_headers: NtHeaders,
     sections: Sections,
     imports: Vec<Import>,
+    export: Option<Export>,
 }
 
 impl PeFile {
@@ -23,11 +24,9 @@ impl PeFile {
 
         let section_alignment = if data_source.is_file_aligned() {
             nt_headers.optional_header().file_alignment()
-        }
-        else {
+        } else {
             nt_headers.optional_header().section_alignment()
         } as usize;
-
 
         let sections = Sections::parse(&*data_source, section_offset, count, section_alignment)?;
 
@@ -65,11 +64,46 @@ impl PeFile {
                     &*data_source,
                     &|rva| sections.RVA2FOA(rva),
                     import_desc,
-                    nt_headers.optional_header().is_pe32_plus()
+                    nt_headers.optional_header().is_pe32_plus(),
                 )?;
                 imports.push(import);
             }
         }
+
+        // 根据对齐方式计算导入表偏移
+        let export_table_offset = if data_source.is_file_aligned() {
+            let virtual_size = nt_headers
+                .optional_header()
+                .data_directory(IMAGE_DIRECTORY_ENTRY_EXPORT)
+                .VirtualAddress;
+            sections.RVA2FOA(virtual_size)
+        } else {
+            nt_headers
+                .optional_header()
+                .data_directory(IMAGE_DIRECTORY_ENTRY_EXPORT)
+                .VirtualAddress
+        };
+
+        let export = if export_table_offset > 0 {
+            let mut uninit_export_desc = MaybeUninit::<IMAGE_EXPORT_DIRECTORY>::uninit();
+
+            unsafe {
+                data_source.read_struct(
+                    export_table_offset as u64,
+                    &mut (*uninit_export_desc.as_mut_ptr()),
+                )?;
+                let export_desc = uninit_export_desc.assume_init();
+
+                Some(Export::parse(
+                    &*data_source,
+                    &|rva| sections.RVA2FOA(rva),
+                    export_desc,
+                    nt_headers.optional_header().is_pe32_plus(),
+                )?)
+            }
+        } else {
+            None
+        };
 
         Ok(Self {
             dos_header,
@@ -77,6 +111,7 @@ impl PeFile {
             nt_headers,
             sections,
             imports,
+            export,
         })
     }
 
@@ -103,6 +138,10 @@ impl PeFile {
 
     pub fn imports(&self) -> &Vec<Import> {
         &self.imports
+    }
+
+    pub fn export(&self) -> Option<&Export> {
+        self.export.as_ref()
     }
 
     // -- Reports ------------------------------------------------------------
@@ -178,6 +217,7 @@ pub enum ParseError {
     },
     /// An underlying data-source error.
     DataSource(crate::data_source::DataSourceError),
+    Unknown,
 }
 
 impl std::fmt::Display for ParseError {
@@ -191,6 +231,9 @@ impl std::fmt::Display for ParseError {
                     f,
                     "invalid DOS magic: expected \"{expected}\", got \"{found}\""
                 )
+            }
+            ParseError::Unknown => {
+                write!(f, "unknown PE data source error")
             }
             ParseError::DataSource(e) => write!(f, "{e}"),
         }

@@ -14,7 +14,7 @@ impl Sections {
         data_source: &T,
         offset: u64,
         count: usize,
-        alignment: usize
+        alignment: usize,
     ) -> Result<Self, ParseError> {
         let mut section_offset = offset;
         let mut sections = Vec::with_capacity(count);
@@ -91,7 +91,7 @@ impl Section {
     pub fn parse<T: DataSource + ?Sized>(
         data_source: &T,
         offset: u64,
-        alignment: usize
+        alignment: usize,
     ) -> Result<(Self, usize), ParseError> {
         let size = std::mem::size_of::<IMAGE_SECTION_HEADER>();
         if data_source.len().unwrap_or(0) < offset + size as u64 {
@@ -112,9 +112,9 @@ impl Section {
         let raw_size = section_header.SizeOfRawData as usize;
         let virtual_size = section_header.VirtualSize as usize;
         let section_size = if data_source.is_file_aligned() {
-            align_up(raw_size,alignment)
+            align_up(raw_size, alignment)
         } else {
-            align_up(virtual_size,alignment)
+            align_up(virtual_size, alignment)
         };
 
         let raw_section_data = data_source.read_bytes(section_offset, section_size)?;
