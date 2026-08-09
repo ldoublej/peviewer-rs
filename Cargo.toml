@@ -1,0 +1,26 @@
+[package]
+name = "peviewer-rs"
+version = "0.1.0"
+edition = "2024"
+
+
+
+[lib]
+name = "pe"
+path = "src/lib/lib.rs"
+
+[[bin]]
+name = "peviewer-rs"
+path = "src/cli/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+comfy-table = "7"
+
+# Only the binary needs this — the library stays free of disassembly deps.
+# (The library never imports iced-x86, so it doesn't matter for the
+# library's compilation, but this keeps the dep graph clean.)
+iced-x86 = "1.21"
+
+[dev-dependencies]
+tempfile = "3"
