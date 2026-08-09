@@ -17,6 +17,7 @@ pub use dos_header::DosHeader;
 pub use file_header::FileHeader;
 pub use image_base::ImageBase;
 pub use import::Import;
+pub use import::ImportEntry;
 pub use nt_headers::NtHeaders;
 pub use optional_header::OptionalHeader;
 pub use section::Section;

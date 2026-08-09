@@ -3,6 +3,7 @@ use comfy_table::presets::UTF8_FULL;
 use comfy_table::{ContentArrangement, Table};
 use pe::PeFile;
 use pe::report::Report;
+use pe::pe_structs_wrapper::ImportEntry;
 use std::path::PathBuf;
 use std::process;
 
@@ -52,7 +53,7 @@ struct Cli {
     #[arg(long)]
     exports: bool,
 
-    /// Print the import directory. (not yet implemented)
+    /// Print the import directory.
     #[arg(long)]
     imports: bool,
 
@@ -164,6 +165,9 @@ fn main() {
         print_report(pe_file.sections_report());
     }
 
+    if want(cli.imports) {
+        print_imports(&pe_file);
+    }
 
     if cli.exports {
         eprintln!("note: --exports is coming soon; not yet implemented");
@@ -173,7 +177,6 @@ fn main() {
     // requested explicitly; `--all` skips them to stay quiet.
     for (requested, name) in [
         (cli.data_directories, "data-directories"),
-        (cli.imports, "imports"),
         (cli.resources, "resources"),
         (cli.exceptions, "exceptions"),
         (cli.security, "security"),
@@ -222,3 +225,26 @@ fn print_report(report: Report) {
     println!("{table}");
 }
 
+
+/// Print the import table: one block per imported DLL, with the
+/// per-function entry kind (by-name or by-ordinal).
+fn print_imports(pe_file: &PeFile) {
+    let imports = pe_file.imports();
+    println!("=== Imports ===");
+    if imports.is_empty() {
+        println!("(none)");
+        return;
+    }
+
+    for imp in imports {
+        let entries = imp.import_name_table();
+        println!("  [{}]  ({} functions)", imp.dll_name(), entries.len());
+        for entry in entries {
+            match entry {
+                ImportEntry::ImportByName(_hint, name) => println!("    {name}"),
+                ImportEntry::ImportByOrdinal(ord) => println!("    (ord {ord})"),
+                ImportEntry::FunctionAddress(addr) => println!("    <{addr:#018x}>"),
+            }
+        }
+    }
+}
