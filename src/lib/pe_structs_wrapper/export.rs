@@ -2,20 +2,25 @@ use crate::data_source::{DataSource, DataSourceExt};
 use crate::pe::ParseError;
 use crate::pe_structs::IMAGE_EXPORT_DIRECTORY;
 
+#[derive(Debug, Clone)]
+pub enum ExportEntry {
+    FunctionAddress(u64),
+    FunctionForwarder(String),
+}
 #[derive(Debug)]
 pub struct Export {
     //_export_desc: IMAGE_EXPORT_DIRECTORY,
     name_table: Vec<(String, u16)>,
-    function_addr_table: Vec<u64>,
+    function_addr_table: Vec<ExportEntry>,
     ordinal_base: u16,
 }
 
 impl Export {
-    pub fn parse<T: DataSource + ?Sized>(
+    pub(crate) fn parse<T: DataSource + ?Sized>(
         data_source: &T,
-        rva_to_foa: &dyn Fn(u32) -> u32,
         export_desc: IMAGE_EXPORT_DIRECTORY,
-        _is_pe32p: bool,
+        export_dir_range: (u32, u32),
+        rva_to_foa: &dyn Fn(u32) -> u32,
     ) -> Result<Self, ParseError> {
         let num_of_name = export_desc.NumberOfNames;
         let mut names_offset = rva_to_foa(export_desc.AddressOfNames);
@@ -48,15 +53,29 @@ impl Export {
             export_desc.AddressOfFunctions
         };
         // 用真实循环上界预分配容量
-        let mut function_addr_table: Vec<u64> = Vec::with_capacity(num_of_functions as usize);
+        let mut function_addr_table: Vec<ExportEntry> = Vec::with_capacity(num_of_functions as usize);
         for i in 0..num_of_functions {
-            let function_virtual_address = data_source
+            let function_rva = data_source
                 .read_u32((function_offset + i * std::mem::size_of::<u32>() as u32) as u64)?;
-            if data_source.is_file_aligned() {
-                function_addr_table.push(rva_to_foa(function_virtual_address) as u64);
-            } else {
-                function_addr_table
-                    .push(data_source.image_base() + function_virtual_address as u64);
+
+            if function_rva >= export_dir_range.0 && function_rva < export_dir_range.0 + export_dir_range.1 {
+
+                let forwarder_offset = if data_source.is_file_aligned() {
+                    rva_to_foa(function_rva) as u64
+                } else {
+                    function_rva as u64
+                };
+
+                let forwader = data_source.read_ascii(forwarder_offset, 256)?;
+                function_addr_table.push(ExportEntry::FunctionForwarder(forwader));
+            }
+            else {
+                if data_source.is_file_aligned() {
+                    function_addr_table.push(ExportEntry::FunctionAddress(rva_to_foa(function_rva) as u64));
+                } else {
+                    function_addr_table
+                        .push(ExportEntry::FunctionAddress(data_source.image_base() + function_rva as u64));
+                }
             }
         }
 
@@ -75,7 +94,7 @@ impl Export {
         })
     }
 
-    pub fn function_address_by_name(&self, function_name: &str) -> Option<u64> {
+    pub fn function_address_by_name(&self, function_name: &str) -> Option<ExportEntry> {
         let potion_index = self
             .name_table
             .iter()
@@ -88,7 +107,7 @@ impl Export {
         }
     }
 
-    pub fn function_address_by_ordinal(&self, function_ordinal: u16) -> Option<u64> {
+    pub fn function_address_by_ordinal(&self, function_ordinal: u16) -> Option<ExportEntry> {
         // 防止 u16 减法下溢 (debug 模式 panic / release 环绕)
         if function_ordinal < self.ordinal_base {
             return None;

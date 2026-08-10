@@ -98,11 +98,17 @@ impl PeFile {
                 )?;
                 let export_desc = uninit_export_desc.assume_init();
 
+                let export_data_dir = nt_headers
+                .optional_header()
+                .data_directory(IMAGE_DIRECTORY_ENTRY_EXPORT);
+
+                let export_dir_range = (export_data_dir.VirtualAddress,export_data_dir.Size);
+
                 Some(Export::parse(
                     &*data_source,
-                    &|rva| sections.RVA2FOA(rva),
                     export_desc,
-                    nt_headers.optional_header().is_pe32_plus(),
+                    export_dir_range,
+                    &|rva| sections.RVA2FOA(rva),
                 )?)
             }
         } else {
