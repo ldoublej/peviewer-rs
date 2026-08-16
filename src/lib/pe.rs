@@ -30,19 +30,22 @@ impl PeFile {
 
         let sections = Sections::parse(&*data_source, section_offset, count, section_alignment)?;
 
+        let is_file_aligned = data_source.is_file_aligned();
+        let auto_rva = |rva: u32| {
+            if is_file_aligned {
+                sections.RVA2FOA(rva)
+            } else {
+                rva
+            }
+        };
+
         // 根据对齐方式计算导入表偏移
-        let mut input_table_offset = if data_source.is_file_aligned() {
-            let virtual_address = nt_headers
-                .optional_header()
-                .data_directory(IMAGE_DIRECTORY_ENTRY_IMPORT)
-                .VirtualAddress;
-            sections.RVA2FOA(virtual_address)
-        } else {
+        let mut input_table_offset = auto_rva(
             nt_headers
                 .optional_header()
                 .data_directory(IMAGE_DIRECTORY_ENTRY_IMPORT)
-                .VirtualAddress
-        };
+                .VirtualAddress,
+        );
 
         // 无导入表时 IMAGE_DIRECTORY_ENTRY_IMPORT.VirtualAddress == 0，
         // 不应继续向下解析（否则会把 DOS 头当 IMAGE_IMPORT_DESCRIPTOR）。
@@ -65,7 +68,7 @@ impl PeFile {
 
                     let import = Import::parse(
                         &*data_source,
-                        &|rva| sections.RVA2FOA(rva),
+                        &auto_rva,
                         import_desc,
                         nt_headers.optional_header().is_pe32_plus(),
                     )?;
@@ -75,18 +78,12 @@ impl PeFile {
         }
 
         // 根据对齐方式计算导入表偏移
-        let export_table_offset = if data_source.is_file_aligned() {
-            let virtual_address = nt_headers
-                .optional_header()
-                .data_directory(IMAGE_DIRECTORY_ENTRY_EXPORT)
-                .VirtualAddress;
-            sections.RVA2FOA(virtual_address)
-        } else {
+        let export_table_offset = auto_rva(
             nt_headers
                 .optional_header()
                 .data_directory(IMAGE_DIRECTORY_ENTRY_EXPORT)
-                .VirtualAddress
-        };
+                .VirtualAddress,
+        );
 
         let export = if export_table_offset > 0 {
             let mut uninit_export_desc = MaybeUninit::<IMAGE_EXPORT_DIRECTORY>::uninit();
@@ -99,16 +96,16 @@ impl PeFile {
                 let export_desc = uninit_export_desc.assume_init();
 
                 let export_data_dir = nt_headers
-                .optional_header()
-                .data_directory(IMAGE_DIRECTORY_ENTRY_EXPORT);
+                    .optional_header()
+                    .data_directory(IMAGE_DIRECTORY_ENTRY_EXPORT);
 
-                let export_dir_range = (export_data_dir.VirtualAddress,export_data_dir.Size);
+                let export_dir_range = (export_data_dir.VirtualAddress, export_data_dir.Size);
 
                 Some(Export::parse(
                     &*data_source,
                     export_desc,
                     export_dir_range,
-                    &|rva| sections.RVA2FOA(rva),
+                    &auto_rva,
                 )?)
             }
         } else {

@@ -34,11 +34,7 @@ impl Export {
             let ordinal = data_source.read_u16(ordinals_offset as u64)?;
             ordinals_offset += std::mem::size_of::<u16>() as u32;
 
-            let name_offset = if data_source.is_file_aligned() {
-                rva_to_foa(name_rva)
-            } else {
-                name_rva
-            };
+            let name_offset = rva_to_foa(name_rva);
 
             let name = data_source.read_ascii(name_offset as u64, 256)?;
             name_table.push((name, ordinal));
@@ -47,34 +43,29 @@ impl Export {
         let num_of_functions = export_desc.NumberOfFunctions;
         // 函数表本身的偏移也按 file_aligned 选择 RVA/FOA——之前无条件 rva_to_foa
         // 在 non-file-aligned 路径下会读错位置
-        let function_offset = if data_source.is_file_aligned() {
-            rva_to_foa(export_desc.AddressOfFunctions)
-        } else {
-            export_desc.AddressOfFunctions
-        };
+        let function_offset = rva_to_foa(export_desc.AddressOfFunctions);
         // 用真实循环上界预分配容量
-        let mut function_addr_table: Vec<ExportEntry> = Vec::with_capacity(num_of_functions as usize);
+        let mut function_addr_table: Vec<ExportEntry> =
+            Vec::with_capacity(num_of_functions as usize);
         for i in 0..num_of_functions {
             let function_rva = data_source
                 .read_u32((function_offset + i * std::mem::size_of::<u32>() as u32) as u64)?;
 
-            if function_rva >= export_dir_range.0 && function_rva < export_dir_range.0 + export_dir_range.1 {
-
-                let forwarder_offset = if data_source.is_file_aligned() {
-                    rva_to_foa(function_rva) as u64
-                } else {
-                    function_rva as u64
-                };
+            if function_rva >= export_dir_range.0
+                && function_rva < export_dir_range.0 + export_dir_range.1
+            {
+                let forwarder_offset = rva_to_foa(function_rva) as u64;
 
                 let forwader = data_source.read_ascii(forwarder_offset, 256)?;
                 function_addr_table.push(ExportEntry::FunctionForwarder(forwader));
-            }
-            else {
+            } else {
                 if data_source.is_file_aligned() {
-                    function_addr_table.push(ExportEntry::FunctionAddress(rva_to_foa(function_rva) as u64));
-                } else {
                     function_addr_table
-                        .push(ExportEntry::FunctionAddress(data_source.image_base() + function_rva as u64));
+                        .push(ExportEntry::FunctionAddress(rva_to_foa(function_rva) as u64));
+                } else {
+                    function_addr_table.push(ExportEntry::FunctionAddress(
+                        data_source.image_base() + function_rva as u64,
+                    ));
                 }
             }
         }

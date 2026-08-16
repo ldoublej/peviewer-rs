@@ -1,8 +1,6 @@
 use crate::data_source::{DataSource, DataSourceExt};
 use crate::pe::ParseError;
-use crate::pe_structs::{
-    IMAGE_IMPORT_DESCRIPTOR, IMAGE_ORDINAL_FLAG32, IMAGE_ORDINAL_FLAG64,
-};
+use crate::pe_structs::{IMAGE_IMPORT_DESCRIPTOR, IMAGE_ORDINAL_FLAG32, IMAGE_ORDINAL_FLAG64};
 
 #[derive(Clone, Debug)]
 pub enum ImportEntry {
