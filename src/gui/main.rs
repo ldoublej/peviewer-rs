@@ -1,10 +1,13 @@
 //! Thin entry point. The actual app + rendering live in sibling modules.
 
 mod app;
-use app::PeViewerApp;
+mod app_context;
+
+
+use app::App;
 use eframe::egui;
 
-const WINDOW_SIZE: [f32; 2] = [1024.0, 720.0];
+const WINDOW_SIZE: [f32; 2] = [512.0, 720.0];
 
 fn main() -> eframe::Result {
     let options = eframe::NativeOptions {
@@ -14,6 +17,6 @@ fn main() -> eframe::Result {
     eframe::run_native(
         "peviewer-gui",
         options,
-        Box::new(|_cc| Ok(Box::<PeViewerApp>::default())),
+        Box::new(|_cc| Ok(Box::<App>::default())),
     )
 }

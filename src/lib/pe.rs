@@ -11,6 +11,7 @@ pub struct PeFile {
     sections: Sections,
     imports: Vec<Import>,
     export: Option<Export>,
+    url: String,
 }
 
 impl PeFile {
@@ -112,6 +113,7 @@ impl PeFile {
             None
         };
 
+        let url = data_source.url();
         Ok(Self {
             dos_header,
             data_source,
@@ -119,6 +121,7 @@ impl PeFile {
             sections,
             imports,
             export,
+            url
         })
     }
 

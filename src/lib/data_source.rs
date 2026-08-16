@@ -132,6 +132,8 @@ pub trait DataSource: Debug + Send + Sync {
     /// Returns [`DataSourceError::OutOfBounds`] if the requested range
     /// `[offset, offset + buf.len())` is not fully contained in the source.
     fn read_exact(&self, offset: u64, buf: &mut [u8]) -> Result<usize, DataSourceError>;
+
+    fn url(&self) -> String;
 }
 
 // ---------------------------------------------------------------------------

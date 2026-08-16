@@ -35,11 +35,6 @@ impl FileDataSource {
             file,
         }))
     }
-
-    /// The path this data source was opened from.
-    pub fn file_path(&self) -> &Path {
-        &self.path
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -78,6 +73,10 @@ impl DataSource for FileDataSource {
         }
 
         Ok(cursor)
+    }
+
+    fn url(&self) -> String {
+        self.path.to_string_lossy().to_string()
     }
 }
 
