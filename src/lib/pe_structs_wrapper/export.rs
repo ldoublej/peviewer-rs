@@ -107,6 +107,17 @@ impl Export {
         }
     }
 
+
+    /// Iterate over every exported function as `(name, ordinal)`.
+    pub fn name_table(&self) -> &[(String, u16)] {
+        &self.name_table
+    }
+
+    /// Ordinal base declared in the export directory (`Base` field).
+    pub fn ordinal_base(&self) -> u16 {
+        self.ordinal_base
+    }
+
     pub fn function_address_by_ordinal(&self, function_ordinal: u16) -> Option<ExportEntry> {
         // 防止 u16 减法下溢 (debug 模式 panic / release 环绕)
         if function_ordinal < self.ordinal_base {
