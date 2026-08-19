@@ -114,6 +114,8 @@ impl eframe::App for App {
             .show(ctx, |ui| {
                 // ui.allocate_space(Vec2::new(12.0, 12.0));
                 ui.label("test");
+
+                ui.button("text");
             });
 
         egui::CentralPanel::default().show(ctx, |ui| {});
