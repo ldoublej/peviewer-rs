@@ -3,7 +3,6 @@
 mod app;
 mod app_context;
 
-
 use app::App;
 use eframe::egui;
 
@@ -14,9 +13,13 @@ fn main() -> eframe::Result {
         viewport: egui::ViewportBuilder::default().with_inner_size(WINDOW_SIZE),
         ..Default::default()
     };
+
     eframe::run_native(
         "peviewer-gui",
         options,
-        Box::new(|_cc| Ok(Box::<App>::default())),
+        Box::new(|cc| {
+            cc.egui_ctx.set_zoom_factor(1.25);
+            Ok(Box::<App>::default())
+        }),
     )
 }

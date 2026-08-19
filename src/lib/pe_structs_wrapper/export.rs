@@ -98,7 +98,6 @@ impl Export {
         }
     }
 
-
     /// Iterate over every exported function as `(name, ordinal)`.
     pub fn name_table(&self) -> &[(String, u16)] {
         &self.name_table

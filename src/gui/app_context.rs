@@ -13,7 +13,6 @@ impl AppContext {
     pub fn set_current_pe(&mut self, pe: PeFile) {
         self.current_url = Some(pe.data_source().url());
         self.pe_file = Some(pe);
-
     }
 
     pub fn clear_current_pe(&mut self) {

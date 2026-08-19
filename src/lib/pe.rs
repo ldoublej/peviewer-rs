@@ -121,7 +121,7 @@ impl PeFile {
             sections,
             imports,
             export,
-            url
+            url,
         })
     }
 
