@@ -1,0 +1,21 @@
+#!/bin/sh
+# Run cargo fmt on staged Rust files before each commit.
+# Files modified by cargo fmt are automatically re-staged.
+
+set -e
+
+# Find staged .rs files (added/copied/modified).
+staged_rust=$(git diff --cached --name-only --diff-filter=ACM | grep '\.rs$' || true)
+
+if [ -z "$staged_rust" ]; then
+    exit 0
+fi
+
+# Format the whole project (cargo fmt does not accept per-file paths).
+cargo fmt
+
+# Re-stage only the files that were originally staged,
+# so we never commit unstaged changes by accident.
+echo "$staged_rust" | xargs git add
+
+exit 0
